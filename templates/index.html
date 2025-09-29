@@ -35,7 +35,7 @@
             margin: 0 auto;
             padding: 20px;
             display: grid;
-            grid-template-columns: 1fr 2fr;
+            grid-template-columns: 350px 1fr;
             gap: 20px;
             min-height: 100vh;
         }
@@ -43,15 +43,37 @@
         @media (max-width: 768px) {
             .container {
                 grid-template-columns: 1fr;
+                padding: 10px;
+            }
+            
+            .sidebar {
+                position: fixed;
+                left: -100%;
+                top: 0;
+                height: 100vh;
+                width: 300px;
+                z-index: 1000;
+                transition: left 0.3s ease;
+            }
+            
+            .sidebar.open {
+                left: 0;
+            }
+            
+            .mobile-toggle {
+                display: block !important;
             }
         }
 
         .sidebar {
-            background: rgba(26, 42, 31, 0.8);
+            background: rgba(26, 42, 31, 0.95);
             border-radius: 15px;
-            padding: 25px;
+            padding: 20px;
             backdrop-filter: blur(10px);
             border: 1px solid var(--medium-green);
+            height: fit-content;
+            position: sticky;
+            top: 20px;
         }
 
         .main-content {
@@ -63,7 +85,7 @@
         .upload-section {
             background: rgba(26, 42, 31, 0.8);
             border-radius: 15px;
-            padding: 25px;
+            padding: 20px;
             backdrop-filter: blur(10px);
             border: 1px solid var(--medium-green);
         }
@@ -77,27 +99,67 @@
             flex-direction: column;
             backdrop-filter: blur(10px);
             border: 1px solid var(--medium-green);
+            min-height: 80vh;
         }
 
         h1 {
             color: var(--deep-orange);
             margin-bottom: 10px;
-            font-size: 2.2em;
+            font-size: 2em;
             text-align: center;
         }
 
         h2 {
             color: var(--light-orange);
-            margin-bottom: 20px;
-            font-size: 1.4em;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+
+        .collapsible {
+            margin-top: 20px;
+        }
+
+        .collapsible-header {
+            background: var(--medium-green);
+            padding: 12px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            font-weight: 600;
+            transition: background 0.3s ease;
+        }
+
+        .collapsible-header:hover {
+            background: var(--light-green);
+        }
+
+        .collapsible-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .collapsible-content.open {
+            max-height: 400px;
+        }
+
+        .toggle-icon {
+            margin-left: auto;
+            transition: transform 0.3s ease;
+        }
+
+        .toggle-icon.rotated {
+            transform: rotate(180deg);
         }
 
         .upload-area {
             border: 2px dashed var(--medium-green);
             border-radius: 10px;
-            padding: 40px 20px;
+            padding: 30px 20px;
             text-align: center;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             transition: all 0.3s ease;
             cursor: pointer;
         }
@@ -116,12 +178,13 @@
             background: linear-gradient(135deg, var(--deep-orange) 0%, var(--light-orange) 100%);
             color: white;
             border: none;
-            padding: 12px 30px;
+            padding: 12px 20px;
             border-radius: 25px;
             cursor: pointer;
-            font-size: 1em;
+            font-size: 0.9em;
             font-weight: 600;
             transition: transform 0.2s ease;
+            width: 100%;
         }
 
         .upload-btn:hover {
@@ -139,22 +202,24 @@
         }
 
         .documents-list {
-            margin-top: 20px;
+            margin-top: 15px;
             max-height: 300px;
             overflow-y: auto;
         }
 
         .document-item {
             background: rgba(58, 90, 64, 0.3);
-            padding: 12px 15px;
-            margin-bottom: 10px;
-            border-radius: 8px;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            border-radius: 6px;
             border-left: 3px solid var(--deep-orange);
+            font-size: 0.9em;
         }
 
         .document-name {
             font-weight: 600;
             color: var(--white);
+            margin-bottom: 4px;
         }
 
         .document-date {
@@ -169,14 +234,20 @@
             background: rgba(10, 15, 13, 0.5);
             border-radius: 10px;
             margin-bottom: 20px;
-            max-height: 400px;
+            max-height: 60vh;
         }
 
         .message {
             margin-bottom: 15px;
             padding: 15px;
             border-radius: 12px;
-            max-width: 80%;
+            max-width: 85%;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         .user-message {
@@ -197,11 +268,14 @@
             color: var(--light-orange);
             margin-top: 8px;
             font-style: italic;
+            border-top: 1px solid var(--medium-green);
+            padding-top: 5px;
         }
 
         .chat-input-container {
             display: flex;
             gap: 10px;
+            align-items: center;
         }
 
         .chat-input {
@@ -223,11 +297,12 @@
             background: linear-gradient(135deg, var(--deep-orange) 0%, var(--light-orange) 100%);
             color: white;
             border: none;
-            padding: 15px 25px;
+            padding: 15px 20px;
             border-radius: 25px;
             cursor: pointer;
             font-size: 1em;
             transition: transform 0.2s ease;
+            min-width: 80px;
         }
 
         .send-btn:hover {
@@ -246,6 +321,7 @@
             margin: 10px 0;
             text-align: center;
             font-weight: 600;
+            font-size: 0.9em;
         }
 
         .status.success {
@@ -269,19 +345,49 @@
             display: block;
         }
 
+        .mobile-toggle {
+            display: none;
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1001;
+            background: var(--deep-orange);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1.2em;
+        }
+
+        .mobile-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+
+        .mobile-overlay.show {
+            display: block;
+        }
+
         /* Scrollbar styling */
         ::-webkit-scrollbar {
-            width: 8px;
+            width: 6px;
         }
 
         ::-webkit-scrollbar-track {
             background: rgba(26, 42, 31, 0.5);
-            border-radius: 4px;
+            border-radius: 3px;
         }
 
         ::-webkit-scrollbar-thumb {
             background: var(--deep-orange);
-            border-radius: 4px;
+            border-radius: 3px;
         }
 
         ::-webkit-scrollbar-thumb:hover {
@@ -290,16 +396,21 @@
     </style>
 </head>
 <body>
+    <button class="mobile-toggle" id="mobileToggle">☰</button>
+    <div class="mobile-overlay" id="mobileOverlay"></div>
+
     <div class="container">
-        <div class="sidebar">
+        <div class="sidebar" id="sidebar">
             <h1>Knowledge Bot</h1>
-            <p>Upload documents and chat with your personal AI assistant!</p>
+            <p style="text-align: center; margin-bottom: 20px; color: var(--gray); font-size: 0.9em;">
+                Upload documents and chat with your personal AI assistant!
+            </p>
             
             <div class="upload-section">
                 <h2>Upload Documents</h2>
                 <div class="upload-area" id="uploadArea">
                     <p>📁 Drop files here or click to upload</p>
-                    <p style="font-size: 0.9em; color: var(--gray); margin-top: 10px;">
+                    <p style="font-size: 0.8em; color: var(--gray); margin-top: 8px;">
                         Supported: PDF, DOCX, TXT
                     </p>
                 </div>
@@ -307,10 +418,19 @@
                 <button class="upload-btn" id="uploadBtn" disabled>Upload Selected Files</button>
                 
                 <div id="uploadStatus"></div>
-                
-                <div class="documents-list">
-                    <h3 style="margin-bottom: 15px; color: var(--light-orange);">Uploaded Documents</h3>
-                    <div id="documentsList"></div>
+            </div>
+
+            <div class="collapsible">
+                <div class="collapsible-header" id="documentsToggle">
+                    📄 Uploaded Documents
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="collapsible-content" id="documentsContent">
+                    <div class="documents-list" id="documentsList">
+                        <p style="color: var(--gray); text-align: center; padding: 20px;">
+                            No documents uploaded yet.
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -320,12 +440,13 @@
                 <h2>Chat with Your Knowledge Base</h2>
                 <div class="chat-messages" id="chatMessages">
                     <div class="message bot-message">
-                        Hello! I'm your personal knowledge assistant. Upload some documents and ask me anything about their content!
+                        <div>Hello! I'm your personal knowledge assistant. Upload some documents and ask me anything about their content!</div>
+                        <div class="sources">I'll search through your uploaded documents to find relevant information.</div>
                     </div>
                 </div>
                 
                 <div class="typing-indicator" id="typingIndicator">
-                    Bot is typing...
+                    Bot is thinking...
                 </div>
                 
                 <div class="chat-input-container">
@@ -348,7 +469,13 @@
                 this.chatInput = document.getElementById('chatInput');
                 this.sendBtn = document.getElementById('sendBtn');
                 this.typingIndicator = document.getElementById('typingIndicator');
+                this.documentsToggle = document.getElementById('documentsToggle');
+                this.documentsContent = document.getElementById('documentsContent');
+                this.mobileToggle = document.getElementById('mobileToggle');
+                this.mobileOverlay = document.getElementById('mobileOverlay');
+                this.sidebar = document.getElementById('sidebar');
 
+                this.documentsExpanded = false;
                 this.initEventListeners();
                 this.loadDocuments();
             }
@@ -396,6 +523,32 @@
                 this.sendBtn.addEventListener('click', () => {
                     this.sendMessage();
                 });
+
+                // Collapsible documents
+                this.documentsToggle.addEventListener('click', () => {
+                    this.toggleDocuments();
+                });
+
+                // Mobile toggle
+                this.mobileToggle.addEventListener('click', () => {
+                    this.toggleSidebar();
+                });
+
+                this.mobileOverlay.addEventListener('click', () => {
+                    this.toggleSidebar();
+                });
+            }
+
+            toggleDocuments() {
+                this.documentsExpanded = !this.documentsExpanded;
+                this.documentsContent.classList.toggle('open', this.documentsExpanded);
+                const toggleIcon = this.documentsToggle.querySelector('.toggle-icon');
+                toggleIcon.classList.toggle('rotated', this.documentsExpanded);
+            }
+
+            toggleSidebar() {
+                this.sidebar.classList.toggle('open');
+                this.mobileOverlay.classList.toggle('show');
             }
 
             updateUploadButton() {
@@ -460,7 +613,7 @@
                     this.documentsList.innerHTML = '';
 
                     if (documents.length === 0) {
-                        this.documentsList.innerHTML = '<p style="color: var(--gray); text-align: center;">No documents uploaded yet.</p>';
+                        this.documentsList.innerHTML = '<p style="color: var(--gray); text-align: center; padding: 20px;">No documents uploaded yet.</p>';
                         return;
                     }
 
@@ -503,10 +656,13 @@
 
                     if (response.ok) {
                         let botMessage = result.answer;
+                        let sourcesHtml = '';
+                        
                         if (result.found_in_kb && result.sources.length > 0) {
-                            botMessage += `\n\n📚 Sources: ${result.sources.join(', ')}`;
+                            sourcesHtml = `<div class="sources">📚 Sources: ${result.sources.join(', ')}</div>`;
                         }
-                        this.addMessage(botMessage, 'bot');
+                        
+                        this.addMessage(botMessage + sourcesHtml, 'bot');
                     } else {
                         this.addMessage(`Sorry, I encountered an error: ${result.error}`, 'bot');
                     }
@@ -518,13 +674,15 @@
                 }
             }
 
-            addMessage(text, sender) {
+            addMessage(content, sender) {
                 const messageDiv = document.createElement('div');
                 messageDiv.className = `message ${sender}-message`;
                 
-                const messageText = document.createElement('div');
-                messageText.textContent = text;
-                messageDiv.appendChild(messageText);
+                if (typeof content === 'string') {
+                    messageDiv.innerHTML = content;
+                } else {
+                    messageDiv.appendChild(content);
+                }
 
                 this.chatMessages.appendChild(messageDiv);
                 this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
