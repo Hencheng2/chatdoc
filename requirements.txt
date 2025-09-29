@@ -5,3 +5,5 @@ python-docx
 pandas
 openpyxl
 gunicorn==23.0.0
+sentence-transformers
+faiss-cpu
