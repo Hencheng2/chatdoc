@@ -1,8 +1,6 @@
-gunicorn==23.0.0
 flask
 flask-cors
 PyPDF2
 python-docx
 pandas
 openpyxl
-
