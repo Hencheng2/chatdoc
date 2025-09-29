@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Personal Knowledge Chatbot</title>
+<style>
+  :root{
+    --bg:#0f1f18; /* deep dark green */
+    --panel:#122a21;
+    --accent:#f07a2b; /* deep orange */
+    --muted:#9fbfae;
+    --white: #ffffff;
+    --glass: rgba(255,255,255,0.03);
+  }
+  *{box-sizing:border-box;font-family: Inter, ui-sans-serif, system-ui;}
+  html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg), #07100b);color:var(--white);}
+  .app{max-width:900px;margin:18px auto;padding:18px;display:flex;flex-direction:column;gap:18px;}
+  .panel{background:var(--panel);border-radius:12px;padding:16px;box-shadow:0 6px 20px rgba(0,0,0,0.6);}
+  header{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+  .logo{width:52px;height:52px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#b85d18);display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;}
+  h1{font-size:18px;margin:0}
+  p.lead{margin:0;color:var(--muted);font-size:13px}
+  /* chat layout */
+  .chat-area{display:flex;flex-direction:column;height:70vh;}
+  .messages{flex:1;overflow:auto;padding:12px;border-radius:8px;background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);margin-bottom:12px;}
+  .msg{margin:8px 0;display:flex;gap:8px;}
+  .msg.user{justify-content:flex-end;}
+  .bubble{max-width:78%;padding:10px 12px;border-radius:12px;background:var(--glass);color:var(--white);font-size:14px;line-height:1.4;}
+  .bubble.user{background:linear-gradient(90deg,#183927, #1c3b2c);}
+  .bubble.bot{background:linear-gradient(90deg,#0f2a1f, #062414);}
+  .controls{display:flex;gap:8px;}
+  .controls textarea{flex:1;min-height:48px;background:transparent;border:1px solid rgba(255,255,255,0.06);padding:8px;border-radius:8px;color:var(--white);}
+  button{background:var(--accent);border:none;padding:10px 12px;border-radius:8px;color:#fff;font-weight:600;cursor:pointer;}
+  button.secondary{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted);}
+  /* admin section */
+  .admin-panel{display:none;flex-direction:column;gap:12px;}
+  .file-list{max-height:220px;overflow:auto;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02)}
+  .file-item{padding:6px;border-bottom:1px solid rgba(255,255,255,0.05);}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="panel">
+    <header>
+      <div class="logo">PK</div>
+      <div>
+        <h1>Personal Knowledge Chatbot</h1>
+        <p class="lead">Chat with your uploaded knowledge base. Database only, no internet fetch.</p>
+      </div>
+    </header>
+
+    <div class="chat-area">
+      <div class="messages" id="messages"></div>
+      <div class="controls">
+        <textarea id="question" placeholder="Ask something..."></textarea>
+        <button id="askBtn">Ask</button>
+        <button id="clearBtn" class="secondary">Clear</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADMIN BUTTON -->
+  <div class="panel">
+    <button id="adminLoginBtn" class="secondary">Admin Login</button>
+    <div class="admin-panel" id="adminPanel">
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input id="fileinput" type="file" />
+        <button id="uploadBtn">Upload</button>
+        <button id="addTextBtn" class="secondary">Add Text</button>
+      </div>
+      <div class="file-list" id="fileList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal for adding text -->
+<div id="textModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);align-items:center;justify-content:center;">
+  <div style="width:92%;max-width:720px;background:var(--panel);padding:14px;border-radius:10px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <strong>Add text</strong>
+      <button id="closeModal" class="secondary">Close</button>
+    </div>
+    <input id="newTitle" placeholder="Title (optional)" style="width:100%;margin-top:8px;padding:8px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--white)"/>
+    <textarea id="newContent" placeholder="Paste or write text here..." style="width:100%;height:240px;margin-top:8px;padding:8px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--white)"></textarea>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px;">
+      <button id="saveTextBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const api = {
+  upload: "/api/upload",
+  add_text: "/api/add_text",
+  chat: "/api/chat",
+  docs: "/api/docs",
+  doc: (id)=>`/api/doc/${id}`
+};
+
+function appendMessage(who, text){
+  const m = document.getElementById("messages");
+  const wrap = document.createElement("div");
+  wrap.className = "msg " + (who==="user"?"user":"bot");
+  const bubble = document.createElement("div");
+  bubble.className = "bubble " + (who==="user"?"user":"bot");
+  bubble.innerText = text;
+  wrap.appendChild(bubble);
+  m.appendChild(wrap);
+  m.scrollTop = m.scrollHeight;
+}
+
+document.getElementById("askBtn").addEventListener("click", async ()=>{
+  const q = document.getElementById("question").value.trim();
+  if(!q) return;
+  appendMessage("user", q);
+  document.getElementById("question").value = "";
+  appendMessage("bot","Searching database...");
+  const r = await fetch(api.chat,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:q})});
+  const j = await r.json();
+  if(j.success) appendMessage("bot", j.answer);
+  else appendMessage("bot", "Error: "+j.error);
+});
+
+document.getElementById("clearBtn").addEventListener("click", ()=>{ document.getElementById("messages").innerHTML=""; });
+
+// ===== ADMIN PASSWORD PROTECTION =====
+document.getElementById("adminLoginBtn").addEventListener("click", ()=>{
+  const pw = prompt("Enter admin password:");
+  if(pw === "Hemley@2003"){
+    document.getElementById("adminPanel").style.display = "flex";
+    appendMessage("bot","Admin mode enabled.");
+  } else {
+    alert("Wrong password.");
+  }
+});
+
+// ===== ADMIN FUNCTIONS =====
+document.getElementById("uploadBtn").addEventListener("click", async ()=>{
+  const f = document.getElementById("fileinput").files[0];
+  if(!f) return alert("Choose a file first");
+  const fd = new FormData(); fd.append("file", f);
+  const res = await fetch(api.upload,{method:"POST",body:fd});
+  const j = await res.json();
+  if(j.success){ appendMessage("bot","Uploaded: "+j.filename); fetchDocs(); }
+  else appendMessage("bot","Upload failed: "+j.error);
+});
+
+document.getElementById("addTextBtn").addEventListener("click",()=>{document.getElementById("textModal").style.display="flex";});
+document.getElementById("closeModal").addEventListener("click",()=>{document.getElementById("textModal").style.display="none";});
+document.getElementById("saveTextBtn").addEventListener("click",async ()=>{
+  const t=document.getElementById("newTitle").value, c=document.getElementById("newContent").value;
+  if(!c.trim()) return;
+  const r=await fetch(api.add_text,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({title:t,content:c})});
+  const j=await r.json();
+  if(j.success){appendMessage("bot","Text saved.");document.getElementById("textModal").style.display="none";fetchDocs();}
+  else appendMessage("bot","Save failed: "+j.error);
+});
+
+async function fetchDocs(){
+  const r=await fetch(api.docs);const j=await r.json();if(!j.success)return;
+  const list=document.getElementById("fileList");list.innerHTML="";
+  j.docs.forEach(d=>{const div=document.createElement("div");div.className="file-item";div.innerText=(d.title||d.filename||"doc-"+d.id)+" — "+new Date(d.added_at).toLocaleString();list.appendChild(div);});
+}
+fetchDocs();
+appendMessage("bot","Ready. Ask questions, or log in as admin to add documents.");
+</script>
+</body>
+</html>
