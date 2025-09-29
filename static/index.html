@@ -1,133 +1,288 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>My Personal AI</title>
-  <style>
-    body {
-      margin: 0; padding: 0;
-      font-family: Arial, sans-serif;
-      background-color: #0d1b0d;
-      color: #eee;
-      display: flex; flex-direction: column;
-      height: 100vh;
-    }
-    header {
-      background: #123d12;
-      padding: 1rem; text-align: center;
-      color: #ff8800; font-size: 1.5rem;
-    }
-    #chat-container {
-      flex: 1; overflow-y: auto; padding: 1rem;
-    }
-    .msg { margin: 0.5rem 0; }
-    .user { color: #ff8800; }
-    .bot { color: #8aff8a; }
-    #input-area {
-      display: flex; padding: 0.5rem;
-      background: #123d12;
-    }
-    #message { flex: 1; padding: 0.5rem; }
-    button {
-      padding: 0.5rem 1rem; margin-left: 0.5rem;
-      background: #ff8800; border: none;
-      color: #fff; cursor: pointer; border-radius: 5px;
-    }
-    #admin {
-      padding: 1rem; background: #1a2e1a;
-      border-top: 1px solid #333;
-    }
-    input, textarea {
-      width: 100%; padding: 0.5rem; margin: 0.5rem 0;
-      background: #0d1b0d; color: #eee; border: 1px solid #444;
-    }
-    #docs-list {
-      margin-top: 1rem;
-      font-size: 0.9rem;
-      color: #ccc;
-    }
-  </style>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Personal Semantic Chatbot</title>
+<style>
+:root{
+  --bg:#07110b;
+  --panel:#0f2a21;
+  --accent:#f07a2b;
+  --muted:#9fbfae;
+  --white:#ffffff;
+}
+*{box-sizing:border-box;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;}
+html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg),#020704);color:var(--white);}
+.container{max-width:1100px;margin:18px auto;padding:18px;display:grid;grid-template-columns:1fr 420px;gap:18px;}
+.panel{background:var(--panel);border-radius:12px;padding:16px;box-shadow:0 8px 30px rgba(0,0,0,0.6);}
+.header{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.logo{width:56px;height:56px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#b85d18);display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff}
+h1{margin:0;font-size:18px}
+.lead{margin:0;color:var(--muted);font-size:13px}
+
+/* Chat area */
+.chat{display:flex;flex-direction:column;height:76vh}
+.messages{flex:1;overflow:auto;padding:14px;border-radius:8px;background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);margin-bottom:12px}
+.msg{margin:8px 0;display:flex}
+.msg.user{justify-content:flex-end}
+.bubble{max-width:78%;padding:12px;border-radius:12px;background:rgba(255,255,255,0.03);font-size:14px;line-height:1.4}
+.bubble.user{background:linear-gradient(90deg,#183927,#1c3b2c);color:var(--white)}
+.bubble.bot{background:linear-gradient(90deg,#0f2a1f,#062414);color:var(--white)}
+.controls{display:flex;gap:8px}
+.controls textarea{flex:1;min-height:54px;background:transparent;border:1px solid rgba(255,255,255,0.06);padding:10px;border-radius:8px;color:var(--white)}
+button{background:var(--accent);border:none;padding:10px 12px;border-radius:8px;color:#fff;font-weight:600;cursor:pointer}
+button.secondary{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted)}
+
+/* Side admin */
+.side{display:flex;flex-direction:column;height:76vh;gap:12px}
+.admin-compact{display:flex;justify-content:space-between;align-items:center}
+.admin-panel{display:none;flex-direction:column;gap:10px}
+.file-list{max-height:220px;overflow:auto;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02)}
+.file-item{padding:8px;border-bottom:1px solid rgba(255,255,255,0.02);display:flex;justify-content:space-between;align-items:center}
+.small{font-size:12px;color:var(--muted)}
+
+/* result cards */
+.result-card{padding:10px;border-radius:8px;background:rgba(0,0,0,0.2);margin-top:8px}
+.score{font-size:12px;color:var(--muted)}
+
+/* responsive */
+@media (max-width:980px){
+  .container{grid-template-columns:1fr;padding:12px}
+  .side{height:auto}
+  .chat{height:60vh}
+}
+</style>
 </head>
 <body>
-  <header>🤖 My Personal AI Chatbot</header>
-  <div id="chat-container"></div>
-  <div id="input-area">
-    <input id="message" type="text" placeholder="Ask me anything...">
-    <button onclick="sendMessage()">Send</button>
+<div class="container">
+  <div class="panel">
+    <div class="header">
+      <div class="logo">PK</div>
+      <div>
+        <h1>Personal Semantic Chatbot</h1>
+        <p class="lead">Ask your knowledge base — semantic search powered by embeddings + FAISS (local).</p>
+      </div>
+    </div>
+
+    <div class="chat">
+      <div id="messages" class="messages" aria-live="polite"></div>
+
+      <div class="controls">
+        <textarea id="question" placeholder="Ask something about your uploaded documents..."></textarea>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <button id="askBtn">Ask</button>
+          <button id="clearBtn" class="secondary">Clear</button>
+        </div>
+      </div>
+    </div>
   </div>
-  <div id="admin">
-    <h3 style="color:#ff8800;">Admin Panel</h3>
-    <input id="password" type="password" placeholder="Password">
-    <input type="file" id="fileInput">
-    <button onclick="uploadFile()">Upload File</button>
-    <textarea id="manualText" placeholder="Add knowledge manually"></textarea>
-    <input id="manualTitle" type="text" placeholder="Title (optional)">
-    <button onclick="addText()">Save Text</button>
-    <div id="docs-list"></div>
+
+  <div class="panel side">
+    <div class="admin-compact">
+      <div>
+        <strong>Admin</strong>
+        <div class="small">Upload/add knowledge (password protected)</div>
+      </div>
+      <div>
+        <button id="adminBtn" class="secondary">Admin Login</button>
+      </div>
+    </div>
+
+    <div id="adminPanel" class="admin-panel" aria-hidden="true">
+      <div>
+        <input id="fileInput" type="file" style="width:100%"/>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button id="uploadBtn">Upload File</button>
+          <button id="refreshBtn" class="secondary">Refresh List</button>
+        </div>
+        <div class="small" style="margin-top:8px">Supported: .txt .md .pdf .docx .csv .xlsx</div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <input id="newTitle" placeholder="Title (optional)" style="padding:8px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--white)"/>
+        <textarea id="newContent" placeholder="Paste or write text to add to DB..." style="height:140px;padding:8px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--white)"></textarea>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button id="saveTextBtn">Save Text</button>
+        </div>
+      </div>
+
+      <div>
+        <strong>Documents</strong>
+        <div id="fileList" class="file-list"></div>
+      </div>
+    </div>
+
+    <div id="adminLoginNote" style="margin-top:12px">
+      <div class="small">Click <strong>Admin Login</strong> and enter the password to reveal upload controls.</div>
+    </div>
   </div>
+</div>
+
 <script>
-function appendMessage(sender, text, cls) {
-  const chat = document.getElementById("chat-container");
-  const div = document.createElement("div");
-  div.className = "msg " + cls;
-  div.innerHTML = `<b>${sender}:</b> ${text}`;
-  chat.appendChild(div);
-  chat.scrollTop = chat.scrollHeight;
+const API = {
+  chat: '/api/chat',
+  upload: '/api/upload',
+  add_text: '/api/add_text',
+  docs: '/api/docs',
+  doc: id => `/api/doc/${id}`,
+  append: id => `/api/append/${id}`,
+  delete: id => `/api/delete/${id}?password=Hemley@2003`
+};
+
+let adminMode = false;
+const ADMIN_PASSWORD = 'Hemley@2003';
+
+function appendMessage(who, html){
+  const c = document.getElementById('messages');
+  const wrap = document.createElement('div');
+  wrap.className = 'msg ' + (who === 'user' ? 'user':'bot');
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble ' + (who === 'user' ? 'user':'bot');
+  bubble.innerHTML = html;
+  wrap.appendChild(bubble);
+  c.appendChild(wrap);
+  c.scrollTop = c.scrollHeight;
 }
 
-async function sendMessage() {
-  const msg = document.getElementById("message").value.trim();
-  if (!msg) return;
-  appendMessage("You", msg, "user");
-  document.getElementById("message").value = "";
+document.getElementById('askBtn').addEventListener('click', async ()=>{
+  const q = document.getElementById('question').value.trim();
+  if(!q) return;
+  appendMessage('user', q.replace(/</g,'&lt;'));
+  document.getElementById('question').value = '';
+  appendMessage('bot', 'Searching your knowledge base...');
   try {
-    const res = await fetch("/api/chat", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({message: msg})
+    const res = await fetch(API.chat, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({message: q})});
+    const j = await res.json();
+    if(j.success){
+      if(j.results && j.results.length){
+        // present results with scores
+        const html = j.results.map(r => `<div class="result-card"><strong>${escapeHtml(r.title)}</strong><div class="score">score: ${('score' in r? r.score.toFixed(3):'—')}</div><div style="margin-top:8px;color:var(--muted);white-space:pre-wrap">${escapeHtml(r.snippet)}</div><div style="margin-top:8px"><button data-id="${r.id}" class="viewDocBtn secondary">View</button> <button data-id="${r.id}" class="askDocBtn">Ask about doc</button></div></div>`).join('');
+        appendMessage('bot', `<div>Found ${j.results.length} matches (mode: ${j.mode || 'semantic'}):</div>${html}`);
+        setTimeout(()=>{ document.querySelectorAll('.viewDocBtn').forEach(b=>b.addEventListener('click', ()=>viewDoc(b.getAttribute('data-id')))); document.querySelectorAll('.askDocBtn').forEach(b=>b.addEventListener('click', ()=>askDoc(b.getAttribute('data-id')))); }, 50);
+      } else {
+        appendMessage('bot', `No matches found (mode: ${j.mode || 'semantic'}).`);
+      }
+    } else {
+      appendMessage('bot', `Error: ${j.error || 'unknown'}`);
+    }
+  } catch (e){
+    appendMessage('bot', 'Network error: ' + (e.message || e));
+    console.error(e);
+  }
+});
+
+document.getElementById('clearBtn').addEventListener('click', ()=>{ document.getElementById('messages').innerHTML=''; });
+
+document.getElementById('adminBtn').addEventListener('click', ()=>{
+  const pw = prompt('Enter admin password:');
+  if(pw === ADMIN_PASSWORD){
+    adminMode = true;
+    document.getElementById('adminPanel').style.display='flex';
+    document.getElementById('adminPanel').setAttribute('aria-hidden','false');
+    appendMessage('bot', '<em>Admin mode enabled.</em>');
+    loadDocs();
+  } else {
+    alert('Wrong password.');
+  }
+});
+
+document.getElementById('uploadBtn').addEventListener('click', async ()=>{
+  if(!adminMode) return alert('Admin login required.');
+  const f = document.getElementById('fileInput').files[0];
+  if(!f) return alert('Select a file.');
+  const fd = new FormData();
+  fd.append('file', f);
+  fd.append('password', ADMIN_PASSWORD);
+  appendMessage('user', `Uploading file: <strong>${f.name}</strong>`);
+  try {
+    const res = await fetch(API.upload, {method:'POST', body: fd});
+    const j = await res.json();
+    if(j.success){ appendMessage('bot', `Uploaded & indexed: <strong>${j.id}</strong>`); loadDocs(); }
+    else appendMessage('bot', `Upload failed: ${j.error || JSON.stringify(j)}`);
+  } catch (e) {
+    appendMessage('bot', 'Upload error. See console.'); console.error(e);
+  }
+});
+
+document.getElementById('saveTextBtn').addEventListener('click', async ()=>{
+  if(!adminMode) return alert('Admin login required.');
+  const title = document.getElementById('newTitle').value.trim();
+  const content = document.getElementById('newContent').value.trim();
+  if(!content) return alert('Enter text to save.');
+  try {
+    const res = await fetch(API.add_text, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({title, content, password: ADMIN_PASSWORD})});
+    const j = await res.json();
+    if(j.success){ appendMessage('bot', `Saved text (id: ${j.id})`); document.getElementById('newTitle').value=''; document.getElementById('newContent').value=''; loadDocs(); }
+    else appendMessage('bot', `Save failed: ${j.error || JSON.stringify(j)}`);
+  } catch (e){ appendMessage('bot', 'Save error. See console.'); console.error(e); }
+});
+
+document.getElementById('refreshBtn').addEventListener('click', ()=> loadDocs());
+
+async function loadDocs(){
+  try{
+    const res = await fetch(API.docs);
+    const j = await res.json();
+    const el = document.getElementById('fileList');
+    el.innerHTML = '';
+    j.docs.forEach(d=>{
+      const div = document.createElement('div');
+      div.className='file-item';
+      div.innerHTML = `<div>
+        <div style="font-weight:700">${escapeHtml(d.title || d.filename || ('doc-'+d.id))}</div>
+        <div class="small">ID: ${d.id}</div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="secondary" data-id="${d.id}" data-act="view">View</button>
+        <button data-id="${d.id}" data-act="ask">Ask</button>
+        <button class="secondary" data-id="${d.id}" data-act="delete">Del</button>
+      </div>`;
+      el.appendChild(div);
     });
-    const data = await res.json();
-    if (data.response) appendMessage("Bot", data.response, "bot");
-    else if (data.error) appendMessage("Bot", "⚠️ Error: " + data.error, "bot");
-  } catch (err) {
-    appendMessage("Bot", "⚠️ Network error: " + err.message, "bot");
+    el.querySelectorAll('button').forEach(b=>{
+      b.addEventListener('click', async ()=>{
+        const id = b.getAttribute('data-id'), act = b.getAttribute('data-act');
+        if(act === 'view') viewDoc(id);
+        if(act === 'ask') askDoc(id);
+        if(act === 'delete') {
+          if(!confirm('Delete doc?')) return;
+          const res = await fetch(API.delete(id), {method:'DELETE'});
+          const j = await res.json();
+          if(j.success){ appendMessage('bot','Deleted.'); loadDocs(); } else appendMessage('bot','Delete failed: '+(j.error||JSON.stringify(j)));
+        }
+      });
+    });
+  }catch(e){
+    console.error(e);
   }
 }
 
-async function uploadFile() {
-  const file = document.getElementById("fileInput").files[0];
-  const password = document.getElementById("password").value;
-  if (!file || !password) { alert("File and password required"); return; }
-  const form = new FormData();
-  form.append("file", file);
-  form.append("password", password);
-  const res = await fetch("/api/upload", {method: "POST", body: form});
-  const data = await res.json();
-  alert(data.success ? "Uploaded!" : "Error: " + (data.error || "unknown"));
-  loadDocs();
+async function viewDoc(id){
+  try{
+    const res = await fetch(API.doc(id));
+    const j = await res.json();
+    if(!j.success) return appendMessage('bot','Could not load doc');
+    const doc = j.doc;
+    appendMessage('bot', `<strong>${escapeHtml(doc.title)}</strong><div style="color:var(--muted);white-space:pre-wrap;margin-top:8px">${escapeHtml(doc.content.slice(0,3000))}</div>`);
+  }catch(e){console.error(e)}
 }
 
-async function addText() {
-  const text = document.getElementById("manualText").value.trim();
-  const title = document.getElementById("manualTitle").value.trim();
-  const password = document.getElementById("password").value;
-  if (!text || !password) { alert("Text and password required"); return; }
-  const res = await fetch("/api/add_text", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({content: text, title: title, password: password})
-  });
-  const data = await res.json();
-  alert(data.success ? "Text saved!" : "Error: " + (data.error || "unknown"));
-  loadDocs();
+async function askDoc(id){
+  try{
+    const res = await fetch(API.doc(id));
+    const j = await res.json();
+    if(!j.success) return appendMessage('bot','Could not load doc');
+    const doc = j.doc;
+    appendMessage('user', `<em>Show ${escapeHtml(doc.title)}</em>`);
+    appendMessage('bot', `<strong>${escapeHtml(doc.title)}</strong><div style="color:var(--muted);white-space:pre-wrap;margin-top:8px">${escapeHtml(doc.content.slice(0,1200))}</div>`);
+  }catch(e){console.error(e)}
 }
 
-async function loadDocs() {
-  const res = await fetch("/api/docs");
-  const docs = await res.json();
-  const div = document.getElementById("docs-list");
-  div.innerHTML = "<b>📂 Knowledge Base:</b><br>" + docs.map(d => `- ${d.title} (${d.filename || "manual"})`).join("<br>");
-}
+function escapeHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br/>'); }
+
+// initial
+appendMessage('bot', 'Hello — semantic search ready. Click Admin Login and enter password to upload or add documents.');
 loadDocs();
 </script>
 </body>
