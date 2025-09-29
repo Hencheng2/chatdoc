@@ -1,289 +1,395 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Personal Semantic Chatbot</title>
-<style>
-:root{
-  --bg:#07110b;
-  --panel:#0f2a21;
-  --accent:#f07a2b;
-  --muted:#9fbfae;
-  --white:#ffffff;
-}
-*{box-sizing:border-box;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;}
-html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg),#020704);color:var(--white);}
-.container{max-width:1100px;margin:18px auto;padding:18px;display:grid;grid-template-columns:1fr 420px;gap:18px;}
-.panel{background:var(--panel);border-radius:12px;padding:16px;box-shadow:0 8px 30px rgba(0,0,0,0.6);}
-.header{display:flex;align-items:center;gap:12px;margin-bottom:12px}
-.logo{width:56px;height:56px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#b85d18);display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff}
-h1{margin:0;font-size:18px}
-.lead{margin:0;color:var(--muted);font-size:13px}
-
-/* Chat area */
-.chat{display:flex;flex-direction:column;height:76vh}
-.messages{flex:1;overflow:auto;padding:14px;border-radius:8px;background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);margin-bottom:12px}
-.msg{margin:8px 0;display:flex}
-.msg.user{justify-content:flex-end}
-.bubble{max-width:78%;padding:12px;border-radius:12px;background:rgba(255,255,255,0.03);font-size:14px;line-height:1.4}
-.bubble.user{background:linear-gradient(90deg,#183927,#1c3b2c);color:var(--white)}
-.bubble.bot{background:linear-gradient(90deg,#0f2a1f,#062414);color:var(--white)}
-.controls{display:flex;gap:8px}
-.controls textarea{flex:1;min-height:54px;background:transparent;border:1px solid rgba(255,255,255,0.06);padding:10px;border-radius:8px;color:var(--white)}
-button{background:var(--accent);border:none;padding:10px 12px;border-radius:8px;color:#fff;font-weight:600;cursor:pointer}
-button.secondary{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted)}
-
-/* Side admin */
-.side{display:flex;flex-direction:column;height:76vh;gap:12px}
-.admin-compact{display:flex;justify-content:space-between;align-items:center}
-.admin-panel{display:none;flex-direction:column;gap:10px}
-.file-list{max-height:220px;overflow:auto;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02)}
-.file-item{padding:8px;border-bottom:1px solid rgba(255,255,255,0.02);display:flex;justify-content:space-between;align-items:center}
-.small{font-size:12px;color:var(--muted)}
-
-/* result cards */
-.result-card{padding:10px;border-radius:8px;background:rgba(0,0,0,0.2);margin-top:8px}
-.score{font-size:12px;color:var(--muted)}
-
-/* responsive */
-@media (max-width:980px){
-  .container{grid-template-columns:1fr;padding:12px}
-  .side{height:auto}
-  .chat{height:60vh}
-}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Knowledge Chatbot</title>
+    <style>
+        body {
+            background-color: #001a00; /* Dark green */
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background-color: #002600;
+        }
+        #session-controls {
+            display: flex;
+            align-items: center;
+        }
+        #session-select {
+            background-color: #003300;
+            color: white;
+            border: none;
+            padding: 5px;
+            margin-right: 10px;
+        }
+        #new-session, #admin-button {
+            background-color: #ff4500; /* Deep orange */
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        #new-session:hover, #admin-button:hover {
+            background-color: #cc3700;
+        }
+        #chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+        }
+        .message {
+            margin: 8px 0;
+            padding: 12px;
+            border-radius: 8px;
+            max-width: 80%;
+            word-wrap: break-word;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .user {
+            background-color: #ff4500; /* Orange */
+            align-self: flex-end;
+        }
+        .bot {
+            background-color: #004d00; /* Darker green */
+            align-self: flex-start;
+        }
+        #input-container {
+            display: flex;
+            padding: 10px;
+            background-color: #002600;
+            border-top: 1px solid #003300;
+        }
+        #query {
+            flex: 1;
+            padding: 10px;
+            background-color: #003300;
+            color: white;
+            border: none;
+            border-radius: 5px 0 0 5px;
+        }
+        #send {
+            background-color: #ff4500;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 0 5px 5px 0;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        #send:hover {
+            background-color: #cc3700;
+        }
+        #admin-panel {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #002600;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+            z-index: 10;
+            width: 80%;
+            max-width: 500px;
+        }
+        #admin-panel h2, #admin-panel h3 {
+            color: #ff4500;
+        }
+        #file-upload {
+            background-color: #003300;
+            color: white;
+            border: none;
+            padding: 10px;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        #upload-btn {
+            background-color: #ff4500;
+            color: white;
+            border: none;
+            padding: 10px;
+            width: 100%;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        #progress {
+            margin-top: 10px;
+            color: #ff4500;
+        }
+        #doc-list {
+            list-style: none;
+            padding: 0;
+        }
+        #doc-list li {
+            background-color: #003300;
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 5px;
+        }
+        #login-modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #002600;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+            z-index: 10;
+            width: 80%;
+            max-width: 300px;
+        }
+        #password {
+            background-color: #003300;
+            color: white;
+            border: none;
+            padding: 10px;
+            width: 100%;
+            margin-bottom: 10px;
+            border-radius: 5px;
+        }
+        #login-btn {
+            background-color: #ff4500;
+            color: white;
+            border: none;
+            padding: 10px;
+            width: 100%;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        /* Responsive design */
+        @media (max-width: 600px) {
+            #header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            #session-controls {
+                width: 100%;
+                justify-content: space-between;
+            }
+            #session-select {
+                flex: 1;
+                margin-right: 5px;
+            }
+            #new-session {
+                margin-right: 5px;
+            }
+            .message {
+                max-width: 95%;
+            }
+        }
+    </style>
 </head>
 <body>
-<div class="container">
-  <div class="panel">
-    <div class="header">
-      <div class="logo">PK</div>
-      <div>
-        <h1>Personal Semantic Chatbot</h1>
-        <p class="lead">Ask your knowledge base — semantic search powered by embeddings + FAISS (local).</p>
-      </div>
-    </div>
-
-    <div class="chat">
-      <div id="messages" class="messages" aria-live="polite"></div>
-
-      <div class="controls">
-        <textarea id="question" placeholder="Ask something about your uploaded documents..."></textarea>
-        <div style="display:flex;flex-direction:column;gap:8px">
-          <button id="askBtn">Ask</button>
-          <button id="clearBtn" class="secondary">Clear</button>
+    <div id="header">
+        <div id="session-controls">
+            <select id="session-select"></select>
+            <button id="new-session">New Chat</button>
         </div>
-      </div>
+        <button id="admin-button">Admin</button>
     </div>
-  </div>
-
-  <div class="panel side">
-    <div class="admin-compact">
-      <div>
-        <strong>Admin</strong>
-        <div class="small">Upload/add knowledge (password protected)</div>
-      </div>
-      <div>
-        <button id="adminBtn" class="secondary">Admin Login</button>
-      </div>
+    <div id="chat-container"></div>
+    <div id="input-container">
+        <input id="query" type="text" placeholder="Ask anything...">
+        <button id="send">Send</button>
     </div>
-
-    <div id="adminPanel" class="admin-panel" aria-hidden="true">
-      <div>
-        <input id="fileInput" type="file" style="width:100%"/>
-        <div style="display:flex;gap:8px;margin-top:8px">
-          <button id="uploadBtn">Upload File</button>
-          <button id="refreshBtn" class="secondary">Refresh List</button>
-        </div>
-        <div class="small" style="margin-top:8px">Supported: .txt .md .pdf .docx .csv .xlsx</div>
-      </div>
-
-      <div style="display:flex;flex-direction:column;gap:8px">
-        <input id="newTitle" placeholder="Title (optional)" style="padding:8px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--white)"/>
-        <textarea id="newContent" placeholder="Paste or write text to add to DB..." style="height:140px;padding:8px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--white)"></textarea>
-        <div style="display:flex;gap:8px;justify-content:flex-end">
-          <button id="saveTextBtn">Save Text</button>
-        </div>
-      </div>
-
-      <div>
-        <strong>Documents</strong>
-        <div id="fileList" class="file-list"></div>
-      </div>
+    <div id="admin-panel">
+        <h2>Admin Panel</h2>
+        <input type="file" id="file-upload">
+        <button id="upload-btn">Upload Document</button>
+        <div id="progress"></div>
+        <h3>Uploaded Documents</h3>
+        <ul id="doc-list"></ul>
+        <button id="close-admin" style="background-color: #cc3700; color: white; border: none; padding: 10px; width: 100%; cursor: pointer; border-radius: 5px; margin-top: 10px;">Close</button>
     </div>
-
-    <div id="adminLoginNote" style="margin-top:12px">
-      <div class="small">Click <strong>Admin Login</strong> and enter the password to reveal upload controls.</div>
+    <div id="login-modal">
+        <input id="password" type="password" placeholder="Enter Password">
+        <button id="login-btn">Login</button>
     </div>
-  </div>
-</div>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            let sessions = JSON.parse(localStorage.getItem('sessions')) || [];
+            let currentSession = localStorage.getItem('currentSession');
+            if (sessions.length === 0) {
+                createNewSession();
+            } else {
+                updateSessionSelect();
+                if (!currentSession || !sessions.includes(currentSession)) {
+                    currentSession = sessions[0];
+                    localStorage.setItem('currentSession', currentSession);
+                }
+                loadHistory(currentSession);
+            }
 
-<script>
-const API = {
-  chat: '/api/chat',
-  upload: '/api/upload',
-  add_text: '/api/add_text',
-  docs: '/api/docs',
-  doc: id => `/api/doc/${id}`,
-  append: id => `/api/append/${id}`,
-  delete: id => `/api/delete/${id}?password=Hemley@2003`
-};
+            function updateSessionSelect() {
+                const select = document.getElementById('session-select');
+                select.innerHTML = '';
+                sessions.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s;
+                    opt.text = `Chat ${s.slice(0, 8)}...`;
+                    select.appendChild(opt);
+                });
+                select.value = currentSession;
+            }
 
-let adminMode = false;
-const ADMIN_PASSWORD = 'Hemley@2003';
+            document.getElementById('new-session').addEventListener('click', createNewSession);
 
-function appendMessage(who, html){
-  const c = document.getElementById('messages');
-  const wrap = document.createElement('div');
-  wrap.className = 'msg ' + (who === 'user' ? 'user':'bot');
-  const bubble = document.createElement('div');
-  bubble.className = 'bubble ' + (who === 'user' ? 'user':'bot');
-  bubble.innerHTML = html;
-  wrap.appendChild(bubble);
-  c.appendChild(wrap);
-  c.scrollTop = c.scrollHeight;
-}
+            function createNewSession() {
+                fetch('/new_session', { method: 'POST' })
+                    .then(res => res.json())
+                    .then(data => {
+                        const sid = data.session_id;
+                        sessions.push(sid);
+                        localStorage.setItem('sessions', JSON.stringify(sessions));
+                        currentSession = sid;
+                        localStorage.setItem('currentSession', sid);
+                        updateSessionSelect();
+                        loadHistory(sid);
+                    })
+                    .catch(err => console.error(err));
+            }
 
-document.getElementById('askBtn').addEventListener('click', async ()=>{
-  const q = document.getElementById('question').value.trim();
-  if(!q) return;
-  appendMessage('user', q.replace(/</g,'&lt;'));
-  document.getElementById('question').value = '';
-  appendMessage('bot', 'Searching your knowledge base...');
-  try {
-    const res = await fetch(API.chat, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({message: q})});
-    const j = await res.json();
-    if(j.success){
-      if(j.results && j.results.length){
-        // present results with scores
-        const html = j.results.map(r => `<div class="result-card"><strong>${escapeHtml(r.title)}</strong><div class="score">score: ${('score' in r? r.score.toFixed(3):'—')}</div><div style="margin-top:8px;color:var(--muted);white-space:pre-wrap">${escapeHtml(r.snippet)}</div><div style="margin-top:8px"><button data-id="${r.id}" class="viewDocBtn secondary">View</button> <button data-id="${r.id}" class="askDocBtn">Ask about doc</button></div></div>`).join('');
-        appendMessage('bot', `<div>Found ${j.results.length} matches (mode: ${j.mode || 'semantic'}):</div>${html}`);
-        setTimeout(()=>{ document.querySelectorAll('.viewDocBtn').forEach(b=>b.addEventListener('click', ()=>viewDoc(b.getAttribute('data-id')))); document.querySelectorAll('.askDocBtn').forEach(b=>b.addEventListener('click', ()=>askDoc(b.getAttribute('data-id')))); }, 50);
-      } else {
-        appendMessage('bot', `No matches found (mode: ${j.mode || 'semantic'}).`);
-      }
-    } else {
-      appendMessage('bot', `Error: ${j.error || 'unknown'}`);
-    }
-  } catch (e){
-    appendMessage('bot', 'Network error: ' + (e.message || e));
-    console.error(e);
-  }
-});
+            document.getElementById('session-select').addEventListener('change', (e) => {
+                currentSession = e.target.value;
+                localStorage.setItem('currentSession', currentSession);
+                loadHistory(currentSession);
+            });
 
-document.getElementById('clearBtn').addEventListener('click', ()=>{ document.getElementById('messages').innerHTML=''; });
+            function loadHistory(sid) {
+                fetch(`/history?session_id=${sid}`)
+                    .then(res => res.json())
+                    .then(msgs => {
+                        const container = document.getElementById('chat-container');
+                        container.innerHTML = '';
+                        msgs.forEach(m => addMessage(m.role, m.content));
+                        container.scrollTop = container.scrollHeight;
+                    })
+                    .catch(err => console.error(err));
+            }
 
-document.getElementById('adminBtn').addEventListener('click', ()=>{
-  const pw = prompt('Enter admin password:');
-  if(pw === ADMIN_PASSWORD){
-    adminMode = true;
-    document.getElementById('adminPanel').style.display='flex';
-    document.getElementById('adminPanel').setAttribute('aria-hidden','false');
-    appendMessage('bot', '<em>Admin mode enabled.</em>');
-    loadDocs();
-  } else {
-    alert('Wrong password.');
-  }
-});
+            function addMessage(role, content) {
+                const div = document.createElement('div');
+                div.classList.add('message', role);
+                div.textContent = content;
+                document.getElementById('chat-container').appendChild(div);
+            }
 
-document.getElementById('uploadBtn').addEventListener('click', async ()=>{
-  if(!adminMode) return alert('Admin login required.');
-  const f = document.getElementById('fileInput').files[0];
-  if(!f) return alert('Select a file.');
-  const fd = new FormData();
-  fd.append('file', f);
-  fd.append('password', ADMIN_PASSWORD);
-  appendMessage('user', `Uploading file: <strong>${f.name}</strong>`);
-  try {
-    const res = await fetch(API.upload, {method:'POST', body: fd});
-    const j = await res.json();
-    if(j.success){ appendMessage('bot', `Uploaded & indexed: <strong>${j.id}</strong>`); loadDocs(); }
-    else appendMessage('bot', `Upload failed: ${j.error || JSON.stringify(j)}`);
-  } catch (e) {
-    appendMessage('bot', 'Upload error. See console.'); console.error(e);
-  }
-});
+            document.getElementById('send').addEventListener('click', sendQuery);
+            document.getElementById('query').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') sendQuery();
+            });
 
-document.getElementById('saveTextBtn').addEventListener('click', async ()=>{
-  if(!adminMode) return alert('Admin login required.');
-  const title = document.getElementById('newTitle').value.trim();
-  const content = document.getElementById('newContent').value.trim();
-  if(!content) return alert('Enter text to save.');
-  try {
-    const res = await fetch(API.add_text, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({title, content, password: ADMIN_PASSWORD})});
-    const j = await res.json();
-    if(j.success){ appendMessage('bot', `Saved text (id: ${j.id})`); document.getElementById('newTitle').value=''; document.getElementById('newContent').value=''; loadDocs(); }
-    else appendMessage('bot', `Save failed: ${j.error || JSON.stringify(j)}`);
-  } catch (e){ appendMessage('bot', 'Save error. See console.'); console.error(e); }
-});
+            function sendQuery() {
+                const query = document.getElementById('query').value.trim();
+                if (!query) return;
+                addMessage('user', query);
+                document.getElementById('query').value = '';
+                document.getElementById('chat-container').scrollTop = document.getElementById('chat-container').scrollHeight;
+                fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: currentSession, query })
+                })
+                    .then(res => res.json())
+                    .then(data => {
+                        addMessage('bot', data.response);
+                        document.getElementById('chat-container').scrollTop = document.getElementById('chat-container').scrollHeight;
+                    })
+                    .catch(err => console.error(err));
+            }
 
-document.getElementById('refreshBtn').addEventListener('click', ()=> loadDocs());
+            // Admin
+            const modal = document.getElementById('login-modal');
+            const adminPanel = document.getElementById('admin-panel');
+            document.getElementById('admin-button').addEventListener('click', () => {
+                modal.style.display = 'block';
+            });
 
-async function loadDocs(){
-  try{
-    const res = await fetch(API.docs);
-    const j = await res.json();
-    const el = document.getElementById('fileList');
-    el.innerHTML = '';
-    j.docs.forEach(d=>{
-      const div = document.createElement('div');
-      div.className='file-item';
-      div.innerHTML = `<div>
-        <div style="font-weight:700">${escapeHtml(d.title || d.filename || ('doc-'+d.id))}</div>
-        <div class="small">ID: ${d.id}</div>
-      </div>
-      <div style="display:flex;gap:6px">
-        <button class="secondary" data-id="${d.id}" data-act="view">View</button>
-        <button data-id="${d.id}" data-act="ask">Ask</button>
-        <button class="secondary" data-id="${d.id}" data-act="delete">Del</button>
-      </div>`;
-      el.appendChild(div);
-    });
-    el.querySelectorAll('button').forEach(b=>{
-      b.addEventListener('click', async ()=>{
-        const id = b.getAttribute('data-id'), act = b.getAttribute('data-act');
-        if(act === 'view') viewDoc(id);
-        if(act === 'ask') askDoc(id);
-        if(act === 'delete') {
-          if(!confirm('Delete doc?')) return;
-          const res = await fetch(API.delete(id), {method:'DELETE'});
-          const j = await res.json();
-          if(j.success){ appendMessage('bot','Deleted.'); loadDocs(); } else appendMessage('bot','Delete failed: '+(j.error||JSON.stringify(j)));
-        }
-      });
-    });
-  }catch(e){
-    console.error(e);
-  }
-}
+            document.getElementById('login-btn').addEventListener('click', () => {
+                const pw = document.getElementById('password').value;
+                fetch('/admin_login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `password=${encodeURIComponent(pw)}`
+                })
+                    .then(res => {
+                        if (res.ok) {
+                            modal.style.display = 'none';
+                            adminPanel.style.display = 'block';
+                            loadDocuments();
+                        } else {
+                            alert('Invalid password');
+                        }
+                    })
+                    .catch(err => console.error(err));
+            });
 
-async function viewDoc(id){
-  try{
-    const res = await fetch(API.doc(id));
-    const j = await res.json();
-    if(!j.success) return appendMessage('bot','Could not load doc');
-    const doc = j.doc;
-    appendMessage('bot', `<strong>${escapeHtml(doc.title)}</strong><div style="color:var(--muted);white-space:pre-wrap;margin-top:8px">${escapeHtml(doc.content.slice(0,3000))}</div>`);
-  }catch(e){console.error(e)}
-}
+            document.getElementById('close-admin').addEventListener('click', () => {
+                adminPanel.style.display = 'none';
+            });
 
-async function askDoc(id){
-  try{
-    const res = await fetch(API.doc(id));
-    const j = await res.json();
-    if(!j.success) return appendMessage('bot','Could not load doc');
-    const doc = j.doc;
-    appendMessage('user', `<em>Show ${escapeHtml(doc.title)}</em>`);
-    appendMessage('bot', `<strong>${escapeHtml(doc.title)}</strong><div style="color:var(--muted);white-space:pre-wrap;margin-top:8px">${escapeHtml(doc.content.slice(0,1200))}</div>`);
-  }catch(e){console.error(e)}
-}
+            document.getElementById('upload-btn').addEventListener('click', () => {
+                const fileInput = document.getElementById('file-upload');
+                const file = fileInput.files[0];
+                if (!file) return;
+                const formData = new FormData();
+                formData.append('file', file);
+                const progress = document.getElementById('progress');
+                progress.textContent = 'Uploading...';
+                fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                })
+                    .then(res => {
+                        if (res.ok) {
+                            progress.textContent = 'Upload successful!';
+                            fileInput.value = '';
+                            loadDocuments();
+                            setTimeout(() => { progress.textContent = ''; }, 3000);
+                        } else {
+                            progress.textContent = 'Upload failed.';
+                        }
+                    })
+                    .catch(err => {
+                        progress.textContent = 'Error during upload.';
+                        console.error(err);
+                    });
+            });
 
-function escapeHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br/>'); }
-
-// initial
-appendMessage('bot', 'Hello — semantic search ready. Click Admin Login and enter password to upload or add documents.');
-loadDocs();
-</script>
+            function loadDocuments() {
+                fetch('/documents')
+                    .then(res => res.json())
+                    .then(docs => {
+                        const ul = document.getElementById('doc-list');
+                        ul.innerHTML = '';
+                        docs.forEach(d => {
+                            const li = document.createElement('li');
+                            li.textContent = `${d.name} (Uploaded: ${new Date(d.date).toLocaleString()})`;
+                            ul.appendChild(li);
+                        });
+                    })
+                    .catch(err => console.error(err));
+            }
+        });
+    </script>
 </body>
 </html>
