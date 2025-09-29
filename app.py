@@ -8,6 +8,10 @@ from datetime import datetime
 import PyPDF2
 import docx
 import chardet
+import re
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
 
 app = Flask(__name__)
 CORS(app)
@@ -63,6 +67,59 @@ def extract_text_from_txt(file):
     encoding = chardet.detect(raw_data)['encoding']
     return raw_data.decode(encoding)
 
+def preprocess_text(text):
+    """Clean and preprocess text for better search"""
+    # Convert to lowercase
+    text = text.lower()
+    # Remove extra whitespace
+    text = ' '.join(text.split())
+    # Remove special characters but keep words
+    text = re.sub(r'[^\w\s]', ' ', text)
+    return text
+
+def find_best_matches(question, chunks_data, top_k=3):
+    """Use TF-IDF and cosine similarity to find best matches"""
+    if not chunks_data:
+        return []
+    
+    # Preprocess question
+    processed_question = preprocess_text(question)
+    
+    # Prepare documents: question + all chunks
+    documents = [processed_question]
+    chunk_texts = []
+    chunk_info = []
+    
+    for chunk_text, filename, chunk_id in chunks_data:
+        processed_chunk = preprocess_text(chunk_text)
+        documents.append(processed_chunk)
+        chunk_texts.append(processed_chunk)
+        chunk_info.append((chunk_text, filename, chunk_id))
+    
+    # Create TF-IDF matrix
+    vectorizer = TfidfVectorizer(stop_words='english', max_features=1000)
+    try:
+        tfidf_matrix = vectorizer.fit_transform(documents)
+    except:
+        # Fallback if TF-IDF fails
+        return chunks_data[:top_k]
+    
+    # Calculate similarity between question and all chunks
+    question_vector = tfidf_matrix[0]
+    chunk_vectors = tfidf_matrix[1:]
+    
+    similarities = cosine_similarity(question_vector, chunk_vectors).flatten()
+    
+    # Get top k matches
+    top_indices = similarities.argsort()[-top_k:][::-1]
+    
+    best_matches = []
+    for idx in top_indices:
+        if similarities[idx] > 0.1:  # Similarity threshold
+            best_matches.append(chunk_info[idx])
+    
+    return best_matches
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -117,31 +174,38 @@ def upload_document():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-def split_into_chunks(text, chunk_size=500):
-    words = text.split()
+def split_into_chunks(text, chunk_size=300):
+    """Split text into smaller chunks for better search"""
+    sentences = re.split(r'[.!?]+', text)
     chunks = []
     current_chunk = []
-    current_size = 0
+    current_length = 0
     
-    for word in words:
-        current_chunk.append(word)
-        current_size += len(word) + 1
-        
-        if current_size >= chunk_size:
-            chunks.append(' '.join(current_chunk))
-            current_chunk = []
-            current_size = 0
+    for sentence in sentences:
+        sentence = sentence.strip()
+        if not sentence:
+            continue
+            
+        sentence_length = len(sentence)
+        if current_length + sentence_length <= chunk_size:
+            current_chunk.append(sentence)
+            current_length += sentence_length
+        else:
+            if current_chunk:
+                chunks.append('. '.join(current_chunk) + '.')
+            current_chunk = [sentence]
+            current_length = sentence_length
     
     if current_chunk:
-        chunks.append(' '.join(current_chunk))
+        chunks.append('. '.join(current_chunk) + '.')
     
-    return chunks
+    return chunks if chunks else [text]
 
 @app.route('/chat', methods=['POST'])
 def chat():
     try:
         data = request.json
-        question = data.get('question', '').strip().lower()
+        question = data.get('question', '').strip()
         
         if not question:
             return jsonify({'error': 'No question provided'}), 400
@@ -149,32 +213,41 @@ def chat():
         conn = sqlite3.connect('knowledge_base.db')
         c = conn.cursor()
         
-        # Search in document chunks
+        # Get all chunks with their document info
         c.execute('''
-            SELECT chunk_text, filename 
+            SELECT dc.chunk_text, d.filename, dc.id
             FROM document_chunks dc
             JOIN documents d ON dc.document_id = d.id
-            WHERE chunk_text LIKE ? 
-            ORDER BY dc.chunk_index
-        ''', (f'%{question}%',))
+        ''')
         
-        results = c.fetchall()
+        all_chunks = c.fetchall()
         conn.close()
         
-        if results:
-            # Combine relevant chunks
-            answer_parts = []
-            sources = set()
-            for chunk, filename in results:
-                answer_parts.append(chunk)
-                sources.add(filename)
+        if all_chunks:
+            # Use improved search with TF-IDF
+            best_matches = find_best_matches(question, all_chunks, top_k=3)
             
-            answer = " ".join(answer_parts[:3])  # Limit response length
-            response = {
-                'answer': answer,
-                'sources': list(sources),
-                'found_in_kb': True
-            }
+            if best_matches:
+                # Combine best matches
+                answer_parts = []
+                sources = set()
+                
+                for chunk_text, filename, chunk_id in best_matches:
+                    answer_parts.append(chunk_text)
+                    sources.add(filename)
+                
+                answer = "\n\n".join(answer_parts)
+                response = {
+                    'answer': answer,
+                    'sources': list(sources),
+                    'found_in_kb': True
+                }
+            else:
+                response = {
+                    'answer': "I've reviewed my knowledge base but couldn't find specific information about that topic. The documents I have don't seem to contain details matching your question. You might want to upload more specific documents or try rephrasing your question.",
+                    'sources': [],
+                    'found_in_kb': False
+                }
         else:
             response = {
                 'answer': "I couldn't find information about that in my knowledge base. Please upload relevant documents to help me learn about this topic.",
@@ -185,6 +258,7 @@ def chat():
         return jsonify(response)
     
     except Exception as e:
+        print(f"Error in chat: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/documents', methods=['GET'])
@@ -211,5 +285,42 @@ def get_documents():
     
     return jsonify(docs_list)
 
+@app.route('/search-debug', methods=['POST'])
+def search_debug():
+    """Debug endpoint to see what's in the database"""
+    data = request.json
+    question = data.get('question', '')
+    
+    conn = sqlite3.connect('knowledge_base.db')
+    c = conn.cursor()
+    
+    # Get all chunks
+    c.execute('''
+        SELECT dc.chunk_text, d.filename 
+        FROM document_chunks dc
+        JOIN documents d ON dc.document_id = d.id
+        LIMIT 5
+    ''')
+    
+    sample_chunks = c.fetchall()
+    
+    # Simple search
+    c.execute('''
+        SELECT chunk_text, filename 
+        FROM document_chunks dc
+        JOIN documents d ON dc.document_id = d.id
+        WHERE chunk_text LIKE ? 
+        LIMIT 3
+    ''', (f'%{question}%',))
+    
+    simple_results = c.fetchall()
+    conn.close()
+    
+    return jsonify({
+        'sample_chunks': sample_chunks,
+        'simple_search_results': simple_results,
+        'question': question
+    })
+
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5000)
