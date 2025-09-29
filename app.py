@@ -1,6 +1,5 @@
 import os
 import sqlite3
-import datetime
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from PyPDF2 import PdfReader
@@ -11,6 +10,7 @@ app = Flask(__name__, static_folder="static")
 CORS(app)
 
 DB_FILE = "database.db"
+ADMIN_PASSWORD = "Hemley@2003"
 
 # ---------- DATABASE ----------
 def init_db():
@@ -52,8 +52,8 @@ def extract_text_from_pdf(path):
         reader = PdfReader(path)
         for page in reader.pages:
             text += page.extract_text() + "\n"
-    except:
-        text = ""
+    except Exception as e:
+        print("PDF error:", e)
     return text.strip()
 
 def extract_text_from_docx(path):
@@ -61,22 +61,24 @@ def extract_text_from_docx(path):
     try:
         doc = docx.Document(path)
         text = "\n".join([p.text for p in doc.paragraphs])
-    except:
-        text = ""
+    except Exception as e:
+        print("DOCX error:", e)
     return text.strip()
 
 def extract_text_from_csv(path):
     try:
         df = pd.read_csv(path)
         return df.to_string()
-    except:
+    except Exception as e:
+        print("CSV error:", e)
         return ""
 
 def extract_text_from_xlsx(path):
     try:
         df = pd.read_excel(path)
         return df.to_string()
-    except:
+    except Exception as e:
+        print("XLSX error:", e)
         return ""
 
 # ---------- API ROUTES ----------
@@ -86,14 +88,18 @@ def home():
 
 @app.route("/api/upload", methods=["POST"])
 def upload_file():
+    pw = request.form.get("password")
+    if pw != ADMIN_PASSWORD:
+        return jsonify({"success": False, "error": "Unauthorized"})
+    
     if "file" not in request.files:
         return jsonify({"success": False, "error": "No file part"})
     f = request.files["file"]
     if f.filename == "":
         return jsonify({"success": False, "error": "No selected file"})
 
-    path = os.path.join("uploads", f.filename)
     os.makedirs("uploads", exist_ok=True)
+    path = os.path.join("uploads", f.filename)
     f.save(path)
 
     ext = f.filename.lower().split(".")[-1]
@@ -118,6 +124,9 @@ def upload_file():
 @app.route("/api/add_text", methods=["POST"])
 def add_text():
     data = request.json
+    if data.get("password") != ADMIN_PASSWORD:
+        return jsonify({"success": False, "error": "Unauthorized"})
+
     title = data.get("title") or "Untitled"
     content = data.get("content", "")
     if not content.strip():
@@ -144,17 +153,6 @@ def list_docs():
     docs = [{"id": row[0], "title": row[1], "filename": row[2], "added_at": row[3]} for row in c.fetchall()]
     conn.close()
     return jsonify({"success": True, "docs": docs})
-
-@app.route("/api/doc/<int:doc_id>", methods=["GET"])
-def get_doc(doc_id):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("SELECT id, title, content, filename, added_at FROM documents WHERE id=?", (doc_id,))
-    row = c.fetchone()
-    conn.close()
-    if row:
-        return jsonify({"success": True, "doc": {"id": row[0], "title": row[1], "content": row[2], "filename": row[3], "added_at": row[4]}})
-    return jsonify({"success": False, "error": "Document not found"})
 
 if __name__ == "__main__":
     init_db()
