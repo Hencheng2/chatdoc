@@ -1,287 +1,83 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Personal Semantic Chatbot</title>
-<style>
-:root{
-  --bg:#07110b;
-  --panel:#0f2a21;
-  --accent:#f07a2b;
-  --muted:#9fbfae;
-  --white:#ffffff;
-}
-*{box-sizing:border-box;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;}
-html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg),#020704);color:var(--white);}
-.container{max-width:1200px;margin:18px auto;padding:18px;display:grid;grid-template-columns:1fr 420px;gap:18px;}
-.panel{background:var(--panel);border-radius:12px;padding:16px;box-shadow:0 8px 30px rgba(0,0,0,0.6);}
-.header{display:flex;align-items:center;gap:12px;margin-bottom:12px}
-.logo{width:56px;height:56px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#b85d18);display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff}
-h1{margin:0;font-size:18px}
-.lead{margin:0;color:var(--muted);font-size:13px}
-
-/* Chat area */
-.chat{display:flex;flex-direction:column;height:78vh}
-.messages{flex:1;overflow:auto;padding:14px;border-radius:8px;background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);margin-bottom:12px}
-.msg{margin:8px 0;display:flex}
-.msg.user{justify-content:flex-end}
-.bubble{max-width:80%;padding:12px;border-radius:12px;background:rgba(255,255,255,0.03);font-size:14px;line-height:1.4}
-.bubble.user{background:linear-gradient(90deg,#183927,#1c3b2c);color:var(--white)}
-.bubble.bot{background:linear-gradient(90deg,#0f2a1f,#062414);color:var(--white)}
-.controls{display:flex;gap:8px}
-.controls textarea{flex:1;min-height:54px;background:transparent;border:1px solid rgba(255,255,255,0.06);padding:10px;border-radius:8px;color:var(--white)}
-button{background:var(--accent);border:none;padding:10px 12px;border-radius:8px;color:#fff;font-weight:600;cursor:pointer}
-button.secondary{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted)}
-
-/* Side admin */
-.side{display:flex;flex-direction:column;height:78vh;gap:12px}
-.admin-compact{display:flex;justify-content:space-between;align-items:center}
-.admin-panel{display:none;flex-direction:column;gap:10px}
-.file-list{max-height:260px;overflow:auto;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02)}
-.file-item{padding:8px;border-bottom:1px solid rgba(255,255,255,0.02);display:flex;justify-content:space-between;align-items:center}
-.small{font-size:12px;color:var(--muted)}
-
-/* result card */
-.result-card{padding:10px;border-radius:8px;background:rgba(0,0,0,0.2);margin-top:8px}
-.score{font-size:12px;color:var(--muted)}
-
-/* responsive */
-@media (max-width:980px){
-  .container{grid-template-columns:1fr;padding:12px}
-  .side{height:auto}
-  .chat{height:60vh}
-}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Knowledge Chatbot</title>
+    <link rel="stylesheet" href="static/style.css">
 </head>
 <body>
-<div class="container">
-  <div class="panel">
-    <div class="header">
-      <div class="logo">PK</div>
-      <div>
-        <h1>Personal Semantic Chatbot</h1>
-        <p class="lead">Search your files semantically. Local DB + FAISS embeddings (if available).</p>
-      </div>
-    </div>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h2>Knowledge Base</h2>
+            </div>
+            
+            <!-- Upload Section -->
+            <div class="upload-section">
+                <h3>Add Knowledge</h3>
+                <div class="upload-area" id="uploadArea">
+                    <input type="file" id="fileInput" multiple accept=".txt,.pdf,.docx,.doc,.md,.csv,.json">
+                    <div class="upload-placeholder">
+                        <span>📁</span>
+                        <p>Drop files here or click to upload</p>
+                        <small>Supports: TXT, PDF, DOCX, CSV, JSON</small>
+                    </div>
+                </div>
+                <button id="uploadBtn" class="btn-primary" disabled>Upload Selected Files</button>
+                <div class="progress-bar" id="progressBar" style="display: none;">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+            </div>
 
-    <div class="chat">
-      <div id="messages" class="messages" aria-live="polite"></div>
-
-      <div class="controls">
-        <textarea id="question" placeholder="Ask something about your uploaded documents..."></textarea>
-        <div style="display:flex;flex-direction:column;gap:8px">
-          <button id="askBtn">Ask</button>
-          <button id="clearBtn" class="secondary">Clear</button>
+            <!-- Documents List -->
+            <div class="documents-section">
+                <h3>Stored Documents</h3>
+                <div id="documentsList" class="documents-list">
+                    <div class="empty-state">No documents uploaded yet</div>
+                </div>
+            </div>
         </div>
-      </div>
-    </div>
-  </div>
 
-  <div class="panel side">
-    <div class="admin-compact">
-      <div>
-        <strong>Admin</strong>
-        <div class="small">Upload/add knowledge (password protected)</div>
-      </div>
-      <div>
-        <button id="adminBtn" class="secondary">Admin Login</button>
-      </div>
-    </div>
+        <!-- Main Chat Area -->
+        <div class="main-content">
+            <!-- Header -->
+            <header class="chat-header">
+                <h1>Personal Knowledge Chatbot</h1>
+                <div class="header-actions">
+                    <button id="clearChat" class="btn-secondary">Clear Chat</button>
+                    <button id="newChat" class="btn-secondary" style="margin-left: 10px;">New Chat</button>
+                </div>
+            </header>
 
-    <div id="adminPanel" class="admin-panel" aria-hidden="true">
-      <div>
-        <input id="fileInput" type="file" style="width:100%"/>
-        <div style="display:flex;gap:8px;margin-top:8px">
-          <button id="uploadBtn">Upload File</button>
-          <button id="refreshBtn" class="secondary">Refresh List</button>
+            <!-- Chat Messages -->
+            <div class="chat-container">
+                <div id="chatMessages" class="chat-messages">
+                    <div class="welcome-message">
+                        <h3>Welcome to your Personal Knowledge Chatbot! 👋</h3>
+                        <p>Upload documents to build your knowledge base, then ask me anything about the content.</p>
+                        <p style="margin-top: 10px; font-size: 0.9em; color: var(--accent-orange-light);">
+                            All your data is stored locally and persists between sessions.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat Input -->
+            <div class="chat-input-container">
+                <div class="chat-input-wrapper">
+                    <input type="text" id="chatInput" placeholder="Ask me anything about your documents..." maxlength="1000">
+                    <button id="sendBtn" class="btn-send">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                            <path d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
         </div>
-        <div class="small" style="margin-top:8px">Supported: .txt .md .pdf .docx .csv .xlsx</div>
-      </div>
-
-      <div style="display:flex;flex-direction:column;gap:8px">
-        <input id="newTitle" placeholder="Title (optional)" style="padding:8px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--white)"/>
-        <textarea id="newContent" placeholder="Paste or write text to add to DB..." style="height:140px;padding:8px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--white)"></textarea>
-        <div style="display:flex;gap:8px;justify-content:flex-end">
-          <button id="saveTextBtn">Save Text</button>
-        </div>
-      </div>
-
-      <div>
-        <strong>Documents</strong>
-        <div id="fileList" class="file-list"></div>
-      </div>
     </div>
 
-    <div id="adminLoginNote" style="margin-top:12px">
-      <div class="small">Click <strong>Admin Login</strong> and enter the password to reveal upload controls.</div>
-    </div>
-  </div>
-</div>
-
-<script>
-const API = {
-  chat: '/api/chat',
-  upload: '/api/upload',
-  add_text: '/api/add_text',
-  docs: '/api/docs',
-  doc: id => `/api/doc/${id}`,
-  delete: id => `/api/delete/${id}?password=Hemley@2003`,
-  reindex: '/api/reindex'
-};
-
-const ADMIN_PASSWORD = 'Hemley@2003';
-let adminMode = false;
-
-function appendMessage(who, html) {
-  const c = document.getElementById('messages');
-  const wrap = document.createElement('div');
-  wrap.className = 'msg ' + (who === 'user' ? 'user' : 'bot');
-  const bubble = document.createElement('div');
-  bubble.className = 'bubble ' + (who === 'user' ? 'user' : 'bot');
-  bubble.innerHTML = html;
-  wrap.appendChild(bubble);
-  c.appendChild(wrap);
-  c.scrollTop = c.scrollHeight;
-}
-
-document.getElementById('askBtn').addEventListener('click', async ()=>{
-  const q = document.getElementById('question').value.trim();
-  if(!q) return;
-  appendMessage('user', q.replace(/</g,'&lt;'));
-  document.getElementById('question').value = '';
-  appendMessage('bot', 'Searching your knowledge base...');
-  try {
-    const res = await fetch(API.chat, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({message: q})});
-    const j = await res.json();
-    if(j.success){
-      if(j.results && j.results.length){
-        const html = `<div>Found ${j.results.length} matches (mode: ${j.mode || j.mode === undefined ? (j.mode||'semantic/keyword') : 'semantic/keyword'})</div>` +
-          j.results.map(r => `<div class="result-card"><strong>${escapeHtml(r.title||'Document')}</strong><div class="score">score: ${typeof r.score === 'number' ? r.score.toFixed(3) : '—'}</div><div style="margin-top:8px;color:var(--muted);white-space:pre-wrap">${escapeHtml(r.snippet)}</div><div style="margin-top:8px"><button data-id="${r.doc_id}" class="viewDocBtn secondary">View Doc</button></div></div>`).join('');
-        appendMessage('bot', html);
-        setTimeout(()=>{ document.querySelectorAll('.viewDocBtn').forEach(b=>b.addEventListener('click', ()=>viewDoc(b.getAttribute('data-id')))); }, 50);
-      } else {
-        appendMessage('bot', `No matches found (mode: ${j.mode || 'keyword/semantic'}).`);
-      }
-    } else {
-      appendMessage('bot', `Error: ${j.error || 'unknown'}`);
-    }
-  } catch (e) {
-    appendMessage('bot', 'Network error: ' + (e.message || e));
-    console.error(e);
-  }
-});
-
-document.getElementById('clearBtn').addEventListener('click', ()=>{ document.getElementById('messages').innerHTML = ''; });
-
-document.getElementById('adminBtn').addEventListener('click', ()=>{
-  const pw = prompt('Enter admin password:');
-  if(pw === ADMIN_PASSWORD){
-    adminMode = true;
-    document.getElementById('adminPanel').style.display = 'flex';
-    appendMessage('bot', '<em>Admin mode enabled.</em>');
-    loadDocs();
-  } else {
-    alert('Wrong password.');
-  }
-});
-
-document.getElementById('uploadBtn').addEventListener('click', async ()=>{
-  if(!adminMode) return alert('Admin login required.');
-  const f = document.getElementById('fileInput').files[0];
-  if(!f) return alert('Select a file.');
-  const fd = new FormData();
-  fd.append('file', f);
-  fd.append('password', ADMIN_PASSWORD);
-  appendMessage('user', `Uploading file: <strong>${f.name}</strong>`);
-  try {
-    const res = await fetch(API.upload, {method:'POST', body: fd});
-    const j = await res.json();
-    if(j.success){ appendMessage('bot', `Uploaded (doc id: ${j.id}) — indexing in background.`); loadDocs(); }
-    else appendMessage('bot', `Upload failed: ${j.error || JSON.stringify(j)}`);
-  } catch (e) { appendMessage('bot','Upload error. See console.'); console.error(e); }
-});
-
-document.getElementById('saveTextBtn').addEventListener('click', async ()=>{
-  if(!adminMode) return alert('Admin login required.');
-  const title = document.getElementById('newTitle').value.trim();
-  const content = document.getElementById('newContent').value.trim();
-  if(!content) return alert('Enter text to save.');
-  try {
-    const res = await fetch(API.add_text, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({title, content, password: ADMIN_PASSWORD})});
-    const j = await res.json();
-    if(j.success){ appendMessage('bot', `Saved text (doc id: ${j.id}).`); document.getElementById('newTitle').value=''; document.getElementById('newContent').value=''; loadDocs(); }
-    else appendMessage('bot', `Save failed: ${j.error || JSON.stringify(j)}`);
-  } catch (e) { appendMessage('bot','Save error. See console.'); console.error(e); }
-});
-
-document.getElementById('refreshBtn').addEventListener('click', ()=> loadDocs());
-
-async function loadDocs(){
-  try {
-    const res = await fetch(API.docs);
-    const j = await res.json();
-    const el = document.getElementById('fileList');
-    el.innerHTML = '';
-    if(!j.success) { el.innerText = 'No documents or error'; return; }
-    j.docs.forEach(d=>{
-      const div = document.createElement('div');
-      div.className = 'file-item';
-      div.innerHTML = `<div>
-          <div style="font-weight:700">${escapeHtml(d.title || d.filename || ('doc-'+d.id))}</div>
-          <div class="small">ID: ${d.id}</div>
-        </div>
-        <div style="display:flex;gap:6px">
-          <button class="secondary" data-id="${d.id}" data-act="view">View</button>
-          <button data-id="${d.id}" data-act="ask">Ask</button>
-          <button class="secondary" data-id="${d.id}" data-act="delete">Del</button>
-        </div>`;
-      el.appendChild(div);
-    });
-    el.querySelectorAll('button').forEach(b=>{
-      b.addEventListener('click', async ()=>{
-        const id = b.getAttribute('data-id'), act = b.getAttribute('data-act');
-        if(act === 'view') viewDoc(id);
-        if(act === 'ask') askDoc(id);
-        if(act === 'delete'){
-          if(!confirm('Delete doc?')) return;
-          const res = await fetch(API.delete(id), {method:'DELETE'});
-          const j = await res.json();
-          if(j.success){ appendMessage('bot','Deleted.'); loadDocs(); } else appendMessage('bot','Delete failed: '+(j.error||JSON.stringify(j)));
-        }
-      });
-    });
-  } catch (e) {
-    console.error(e);
-  }
-}
-
-async function viewDoc(id){
-  try {
-    const res = await fetch(API.doc(id));
-    const j = await res.json();
-    if(!j.success) return appendMessage('bot','Could not load doc');
-    const doc = j.doc;
-    appendMessage('bot', `<strong>${escapeHtml(doc.title)}</strong><div style="color:var(--muted);white-space:pre-wrap;margin-top:8px">${escapeHtml(doc.content.slice(0,4000))}</div>`);
-  } catch (e) { console.error(e); }
-}
-
-async function askDoc(id){
-  try {
-    const res = await fetch(API.doc(id));
-    const j = await res.json();
-    if(!j.success) return appendMessage('bot','Could not load doc');
-    const doc = j.doc;
-    appendMessage('user', `<em>Show ${escapeHtml(doc.title)}</em>`);
-    appendMessage('bot', `<strong>${escapeHtml(doc.title)}</strong><div style="color:var(--muted);white-space:pre-wrap;margin-top:8px">${escapeHtml(doc.content.slice(0,1200))}</div>`);
-  } catch (e) { console.error(e); }
-}
-
-function escapeHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br/>'); }
-
-// initial
-appendMessage('bot', 'Hello — semantic search ready. Click Admin Login and enter password to upload or add documents.');
-loadDocs();
-</script>
+    <script src="static/script.js"></script>
 </body>
 </html>
