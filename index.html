@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Knowledge Chatbot</title>
+    <style>
+        :root {
+            --dark-green: #0a2f1e;
+            --medium-green: #1a4a2f;
+            --light-green: #2a6b47;
+            --deep-orange: #ff6b35;
+            --light-orange: #ff8c5a;
+            --white: #ffffff;
+            --light-gray: #e0e0e0;
+            --dark-gray: #2a2a2a;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, var(--dark-green) 0%, var(--medium-green) 100%);
+            color: var(--white);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+            min-height: 100vh;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+                padding: 10px;
+            }
+        }
+
+        /* Sidebar Styles */
+        .sidebar {
+            background: var(--medium-green);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .admin-section {
+            background: var(--dark-green);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .upload-section {
+            margin-bottom: 20px;
+        }
+
+        .file-input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            background: var(--dark-green);
+            border: 2px dashed var(--light-green);
+            border-radius: 8px;
+            color: var(--white);
+            cursor: pointer;
+        }
+
+        .file-input:hover {
+            border-color: var(--deep-orange);
+        }
+
+        .upload-btn {
+            width: 100%;
+            padding: 12px;
+            background: var(--deep-orange);
+            color: var(--white);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .upload-btn:hover {
+            background: var(--light-orange);
+            transform: translateY(-2px);
+        }
+
+        .documents-list {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 15px;
+        }
+
+        .document-item {
+            background: var(--dark-green);
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 6px;
+            font-size: 0.9em;
+            border-left: 3px solid var(--deep-orange);
+        }
+
+        /* Chat Area Styles */
+        .chat-area {
+            display: flex;
+            flex-direction: column;
+            background: var(--medium-green);
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            overflow: hidden;
+        }
+
+        .chat-header {
+            background: var(--dark-green);
+            padding: 20px;
+            text-align: center;
+            border-bottom: 2px solid var(--deep-orange);
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            max-height: 60vh;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .message {
+            max-width: 80%;
+            padding: 15px;
+            border-radius: 15px;
+            margin: 5px 0;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .user-message {
+            background: var(--deep-orange);
+            align-self: flex-end;
+            border-bottom-right-radius: 5px;
+        }
+
+        .bot-message {
+            background: var(--light-green);
+            align-self: flex-start;
+            border-bottom-left-radius: 5px;
+            white-space: pre-wrap;
+        }
+
+        .chat-input-area {
+            padding: 20px;
+            background: var(--dark-green);
+            border-top: 2px solid var(--light-green);
+            display: flex;
+            gap: 10px;
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 25px;
+            background: var(--medium-green);
+            color: var(--white);
+            font-size: 16px;
+            outline: none;
+        }
+
+        .chat-input::placeholder {
+            color: var(--light-gray);
+        }
+
+        .send-btn {
+            padding: 15px 25px;
+            background: var(--deep-orange);
+            color: var(--white);
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .send-btn:hover {
+            background: var(--light-orange);
+            transform: scale(1.05);
+        }
+
+        /* Login Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: var(--medium-green);
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+            border: 2px solid var(--deep-orange);
+        }
+
+        .modal-input {
+            width: 100%;
+            padding: 15px;
+            margin: 15px 0;
+            border: none;
+            border-radius: 8px;
+            background: var(--dark-green);
+            color: var(--white);
+            font-size: 16px;
+        }
+
+        .modal-btn {
+            padding: 12px 30px;
+            background: var(--deep-orange);
+            color: var(--white);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .modal-btn:hover {
+            background: var(--light-orange);
+        }
+
+        /* Progress Bar */
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: var(--dark-green);
+            border-radius: 2px;
+            overflow: hidden;
+            margin: 10px 0;
+            display: none;
+        }
+
+        .progress {
+            width: 0%;
+            height: 100%;
+            background: var(--deep-orange);
+            transition: width 0.3s ease;
+        }
+
+        /* Utility Classes */
+        .hidden {
+            display: none !important;
+        }
+
+        .status-message {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 6px;
+            text-align: center;
+            font-size: 0.9em;
+        }
+
+        .success {
+            background: var(--light-green);
+        }
+
+        .error {
+            background: #dc3545;
+        }
+
+        .session-selector {
+            margin-bottom: 15px;
+        }
+
+        .session-select {
+            width: 100%;
+            padding: 10px;
+            background: var(--dark-green);
+            color: var(--white);
+            border: 1px solid var(--light-green);
+            border-radius: 6px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Modal -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <h2>Admin Login Required</h2>
+            <p>Enter password to access admin features</p>
+            <input type="password" id="passwordInput" class="modal-input" placeholder="Enter password">
+            <button onclick="login()" class="modal-btn">Login</button>
+            <p id="loginMessage" class="status-message error hidden"></p>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="admin-section" id="adminSection">
+                <h3>Admin Panel</h3>
+                <div class="upload-section">
+                    <input type="file" id="fileInput" class="file-input" accept=".txt,.pdf,.docx,.csv,.json">
+                    <button onclick="uploadFile()" class="upload-btn">Upload Document</button>
+                    <div class="progress-bar" id="progressBar">
+                        <div class="progress" id="progress"></div>
+                    </div>
+                </div>
+                
+                <div class="documents-section">
+                    <h4>Uploaded Documents</h4>
+                    <div class="documents-list" id="documentsList">
+                        <!-- Documents will be loaded here -->
+                    </div>
+                </div>
+                
+                <button onclick="logout()" class="upload-btn" style="margin-top: 20px; background: #dc3545;">
+                    Logout
+                </button>
+            </div>
+
+            <div class="session-selector">
+                <h4>Chat Sessions</h4>
+                <select id="sessionSelect" class="session-select" onchange="loadSession()">
+                    <option value="default">Current Session</option>
+                </select>
+                <button onclick="createNewSession()" class="upload-btn" style="margin-top: 10px;">
+                    New Session
+                </button>
+            </div>
+        </div>
+
+        <!-- Chat Area -->
+        <div class="chat-area">
+            <div class="chat-header">
+                <h1>Personal Knowledge Chatbot</h1>
+                <p>Ask me anything about your uploaded documents</p>
+            </div>
+            
+            <div class="chat-messages" id="chatMessages">
+                <div class="message bot-message">
+                    Hello! I'm your personal knowledge assistant. Upload documents and ask me questions about them!
+                </div>
+            </div>
+            
+            <div class="chat-input-area">
+                <input type="text" id="chatInput" class="chat-input" placeholder="Type your message here..." onkeypress="handleKeyPress(event)">
+                <button onclick="sendMessage()" class="send-btn">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentSessionId = 'default';
+        let isAdmin = false;
+
+        // Check admin status on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAdminStatus();
+            loadSessions();
+            setInterval(loadSessions, 30000); // Refresh sessions every 30 seconds
+        });
+
+        async function checkAdminStatus() {
+            try {
+                const response = await fetch('/check_admin');
+                const data = await response.json();
+                isAdmin = data.is_admin;
+                
+                if (!isAdmin) {
+                    document.getElementById('loginModal').style.display = 'flex';
+                } else {
+                    document.getElementById('loginModal').style.display = 'none';
+                    loadDocuments();
+                }
+            } catch (error) {
+                console.error('Error checking admin status:', error);
+            }
+        }
+
+        async function login() {
+            const password = document.getElementById('passwordInput').value;
+            const messageElement = document.getElementById('loginMessage');
+            
+            try {
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ password: password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    isAdmin = true;
+                    document.getElementById('loginModal').style.display = 'none';
+                    loadDocuments();
+                } else {
+                    messageElement.textContent = data.message || 'Invalid password';
+                    messageElement.classList.remove('hidden');
+                }
+            } catch (error) {
+                messageElement.textContent = 'Login failed. Please try again.';
+                messageElement.classList.remove('hidden');
+            }
+        }
+
+        async function logout() {
+            try {
+                await fetch('/logout', { method: 'POST' });
+                isAdmin = false;
+                document.getElementById('loginModal').style.display = 'flex';
+                document.getElementById('documentsList').innerHTML = '';
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+        }
+
+        async function uploadFile() {
+            if (!isAdmin) {
+                alert('Please login as admin to upload files');
+                return;
+            }
+
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Please select a file');
+                return;
+            }
+
+            const progressBar = document.getElementById('progressBar');
+            const progress = document.getElementById('progress');
+            
+            progressBar.style.display = 'block';
+            progress.style.width = '0%';
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    progress.style.width = '100%';
+                    setTimeout(() => {
+                        progressBar.style.display = 'none';
+                        fileInput.value = '';
+                        loadDocuments();
+                        addMessage('File uploaded successfully!', 'bot');
+                    }, 500);
+                } else {
+                    throw new Error(data.message);
+                }
+            } catch (error) {
+                progressBar.style.display = 'none';
+                alert('Upload failed: ' + error.message);
+            }
+        }
+
+        async function loadDocuments() {
+            if (!isAdmin) return;
+
+            try {
+                const response = await fetch('/documents');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const documentsList = document.getElementById('documentsList');
+                    documentsList.innerHTML = '';
+                    
+                    if (data.documents.length === 0) {
+                        documentsList.innerHTML = '<div class="document-item">No documents uploaded yet</div>';
+                    } else {
+                        data.documents.forEach(doc => {
+                            const docElement = document.createElement('div');
+                            docElement.className = 'document-item';
+                            docElement.innerHTML = `
+                                <strong>${doc.filename}</strong><br>
+                                <small>Type: ${doc.file_type} | Size: ${formatFileSize(doc.file_size)}</small>
+                            `;
+                            documentsList.appendChild(docElement);
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading documents:', error);
+            }
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+
+            // Add user message to chat
+            addMessage(message, 'user');
+            input.value = '';
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        session_id: currentSessionId
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    addMessage(data.response, 'bot');
+                } else {
+                    addMessage('Error: ' + data.message, 'bot');
+                }
+            } catch (error) {
+                addMessage('Sorry, there was an error processing your message.', 'bot');
+            }
+        }
+
+        function addMessage(message, sender) {
+            const chatMessages = document.getElementById('chatMessages');
+            const messageElement = document.createElement('div');
+            messageElement.className = `message ${sender}-message`;
+            messageElement.textContent = message;
+            
+            chatMessages.appendChild(messageElement);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        async function loadSessions() {
+            try {
+                const response = await fetch('/sessions');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const sessionSelect = document.getElementById('sessionSelect');
+                    sessionSelect.innerHTML = '<option value="default">Current Session</option>';
+                    
+                    data.sessions.forEach(session => {
+                        if (session.session_id !== 'default') {
+                            const option = document.createElement('option');
+                            option.value = session.session_id;
+                            option.textContent = `Session: ${new Date(session.created_date).toLocaleDateString()}`;
+                            sessionSelect.appendChild(option);
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading sessions:', error);
+            }
+        }
+
+        async function loadSession() {
+            const sessionSelect = document.getElementById('sessionSelect');
+            const newSessionId = sessionSelect.value;
+            
+            if (newSessionId !== currentSessionId) {
+                currentSessionId = newSessionId;
+                await loadChatHistory();
+            }
+        }
+
+        async function loadChatHistory() {
+            try {
+                const response = await fetch(`/chat_history/${currentSessionId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const chatMessages = document.getElementById('chatMessages');
+                    chatMessages.innerHTML = '';
+                    
+                    data.messages.forEach(msg => {
+                        addMessage(msg.message, msg.is_user ? 'user' : 'bot');
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading chat history:', error);
+            }
+        }
+
+        function createNewSession() {
+            currentSessionId = 'session_' + Date.now();
+            const sessionSelect = document.getElementById('sessionSelect');
+            const option = document.createElement('option');
+            option.value = currentSessionId;
+            option.textContent = 'New Session';
+            sessionSelect.appendChild(option);
+            sessionSelect.value = currentSessionId;
+            
+            // Clear chat messages
+            const chatMessages = document.getElementById('chatMessages');
+            chatMessages.innerHTML = '';
+            addMessage('New chat session started!', 'bot');
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+    </script>
+</body>
+</html>
