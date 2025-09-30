@@ -9,3 +9,4 @@ sentence-transformers
 faiss-cpu
 ChromaDB
 numpy
+werkzeug==2.3.7
