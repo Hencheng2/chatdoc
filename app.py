@@ -1,362 +1,320 @@
-#!/usr/bin/env python3
-import os
+from flask import Flask, request, jsonify, send_from_directory, session
+from flask_cors import CORS
 import sqlite3
+import os
+import json
+import hashlib
 import uuid
 from datetime import datetime
-from typing import List, Dict, Any
-import hashlib
-import json
-import io
-
-from fastapi import FastAPI, File, UploadFile, HTTPException, Form
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, JSONResponse
-import uvicorn
-from sentence_transformers import SentenceTransformer
 import chromadb
+from chromadb.config import Settings
+from werkzeug.utils import secure_filename
 import PyPDF2
-from docx import Document
-import aiofiles
-import asyncio
+import docx
+import csv
 
-# Initialize the application
-app = FastAPI(title="Personal Knowledge Chatbot")
+# Initialize Flask app
+app = Flask(__name__)
+app.secret_key = 'your-secret-key-here'
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+CORS(app)
 
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Serve static files (frontend)
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-# Initialize components
-class KnowledgeBase:
-    def __init__(self):
-        self.model = SentenceTransformer('all-MiniLM-L6-v2')
-        self.chroma_client = chromadb.PersistentClient(path="./chroma_db")
-        self.collection = self.chroma_client.get_or_create_collection(name="knowledge_documents")
-        self.init_database()
-    
-    def init_database(self):
-        """Initialize SQLite database for metadata"""
-        conn = sqlite3.connect('knowledge_chatbot.db')
-        cursor = conn.cursor()
-        
-        # Documents table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS documents (
-                id TEXT PRIMARY KEY,
-                filename TEXT NOT NULL,
-                file_type TEXT NOT NULL,
-                file_size INTEGER NOT NULL,
-                content_hash TEXT NOT NULL,
-                upload_date TEXT NOT NULL,
-                chunk_count INTEGER DEFAULT 0,
-                processed BOOLEAN DEFAULT FALSE
-            )
-        ''')
-        
-        # Chat history table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS chat_history (
-                id TEXT PRIMARY KEY,
-                session_id TEXT NOT NULL,
-                question TEXT NOT NULL,
-                answer TEXT NOT NULL,
-                sources TEXT,
-                timestamp TEXT NOT NULL
-            )
-        ''')
-        
-        conn.commit()
-        conn.close()
-    
-    def chunk_text(self, text: str, chunk_size: int = 500, overlap: int = 50) -> List[str]:
-        """Split text into overlapping chunks"""
-        words = text.split()
-        if not words:
-            return []
-            
-        chunks = []
-        
-        for i in range(0, len(words), chunk_size - overlap):
-            chunk = words[i:i + chunk_size]
-            chunks.append(" ".join(chunk))
-            
-            if i + chunk_size >= len(words):
-                break
-                
-        return chunks
-    
-    async def process_file(self, file_content: bytes, filename: str) -> str:
-        """Process different file types and extract text"""
-        file_extension = filename.split('.')[-1].lower()
-        
-        try:
-            if file_extension in ['txt', 'md', 'csv', 'json']:
-                try:
-                    return file_content.decode('utf-8')
-                except:
-                    return file_content.decode('latin-1')
-            
-            elif file_extension == 'pdf':
-                text = ""
-                pdf_file = io.BytesIO(file_content)
-                pdf_reader = PyPDF2.PdfReader(pdf_file)
-                for page in pdf_reader.pages:
-                    page_text = page.extract_text()
-                    if page_text:
-                        text += page_text + "\n"
-                return text
-            
-            elif file_extension in ['docx', 'doc']:
-                doc_file = io.BytesIO(file_content)
-                doc = Document(doc_file)
-                text = ""
-                for paragraph in doc.paragraphs:
-                    if paragraph.text:
-                        text += paragraph.text + "\n"
-                return text
-            
-            else:
-                # Try to read as text file
-                try:
-                    return file_content.decode('utf-8')
-                except:
-                    return file_content.decode('latin-1')
-                    
-        except Exception as e:
-            return f"Error processing file {filename}: {str(e)}"
-    
-    def add_document_to_knowledge(self, file_id: str, filename: str, text_content: str) -> bool:
-        """Add document content to vector database"""
-        if not text_content or len(text_content.strip()) == 0:
-            return False
-            
-        # Generate content hash to avoid duplicates
-        content_hash = hashlib.md5(text_content.encode()).hexdigest()
-        
-        # Check if content already exists
-        conn = sqlite3.connect('knowledge_chatbot.db')
-        cursor = conn.cursor()
-        cursor.execute('SELECT id FROM documents WHERE content_hash = ?', (content_hash,))
-        existing = cursor.fetchone()
-        
-        if existing:
-            conn.close()
-            return False  # Document already exists
-        
-        # Split into chunks
-        chunks = self.chunk_text(text_content)
-        
-        if not chunks:
-            conn.close()
-            return False
-        
-        # Add to vector database
-        for i, chunk in enumerate(chunks):
-            if not chunk.strip():
-                continue
-                
-            chunk_id = f"{file_id}_{i}"
-            embedding = self.model.encode(chunk).tolist()
-            
-            self.collection.add(
-                ids=[chunk_id],
-                embeddings=[embedding],
-                documents=[chunk],
-                metadatas=[{
-                    "file_id": file_id,
-                    "filename": filename,
-                    "chunk_index": i,
-                    "content_hash": content_hash
-                }]
-            )
-        
-        # Save metadata to SQLite
-        cursor.execute('''
-            INSERT INTO documents (id, filename, file_type, file_size, content_hash, upload_date, chunk_count, processed)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            file_id, 
-            filename, 
-            filename.split('.')[-1].lower(),
-            len(text_content.encode('utf-8')),
-            content_hash,
-            datetime.now().isoformat(),
-            len(chunks),
-            True
-        ))
-        
-        conn.commit()
-        conn.close()
-        return True
-    
-    def search_similar_content(self, query: str, n_results: int = 3) -> Dict[str, Any]:
-        """Search for similar content in the knowledge base"""
-        try:
-            query_embedding = self.model.encode(query).tolist()
-            
-            results = self.collection.query(
-                query_embeddings=[query_embedding],
-                n_results=n_results
-            )
-            
-            return {
-                'documents': results['documents'][0] if results['documents'] else [],
-                'metadatas': results['metadatas'][0] if results['metadatas'] else [],
-                'distances': results['distances'][0] if results['distances'] else []
-            }
-        except Exception as e:
-            return {'documents': [], 'metadatas': [], 'distances': []}
-    
-    def generate_answer(self, question: str, context: str) -> str:
-        """Generate answer based on question and context"""
-        if not context or "no relevant" in context.lower() or "error" in context.lower():
-            return "I don't have enough information in my knowledge base to answer this question accurately. Please upload relevant documents first."
-        
-        # Simple rule-based response generation
-        if len(context) > 1000:
-            context_preview = context[:1000] + "..."
-        else:
-            context_preview = context
-            
-        return f"""Based on the information in your documents:
-
-{context_preview}
-
-This answer is generated by searching through your uploaded documents. For more sophisticated responses, you could integrate with an LLM API like OpenAI GPT."""
-    
-    def save_chat_message(self, session_id: str, question: str, answer: str, sources: List[Dict] = None):
-        """Save chat message to database"""
-        chat_id = str(uuid.uuid4())
-        
-        conn = sqlite3.connect('knowledge_chatbot.db')
-        cursor = conn.cursor()
-        
-        # Save chat message
-        cursor.execute('''
-            INSERT INTO chat_history (id, session_id, question, answer, sources, timestamp)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (
-            chat_id,
-            session_id,
-            question,
-            answer,
-            json.dumps(sources) if sources else None,
-            datetime.now().isoformat()
-        ))
-        
-        conn.commit()
-        conn.close()
-
-# Global knowledge base instance
-kb = KnowledgeBase()
-
-@app.get("/", response_class=HTMLResponse)
-async def read_root():
-    # Serve the main HTML file
-    with open("static/index.html", "r", encoding="utf-8") as f:
-        return HTMLResponse(content=f.read())
-
-@app.post("/upload")
-async def upload_file(file: UploadFile = File(...)):
-    try:
-        # Generate unique file ID
-        file_id = str(uuid.uuid4())
-        
-        # Read file content
-        content = await file.read()
-        
-        # Process file
-        text_content = await kb.process_file(content, file.filename)
-        
-        # Add to knowledge base
-        success = kb.add_document_to_knowledge(file_id, file.filename, text_content)
-        
-        if success:
-            return {"message": f"File '{file.filename}' uploaded and processed successfully", "file_id": file_id}
-        else:
-            return {"message": f"File '{file.filename}' was already in the knowledge base (duplicate content)", "file_id": file_id}
-    
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
-
-@app.post("/chat")
-async def chat(question: dict):
-    try:
-        user_question = question.get("question", "")
-        session_id = question.get("session_id", "default")
-        
-        if not user_question:
-            raise HTTPException(status_code=400, detail="Question is required")
-        
-        # Search for similar content
-        search_results = kb.search_similar_content(user_question)
-        
-        # Build context
-        context = "\n\n".join(search_results['documents']) if search_results['documents'] else ""
-        
-        # Generate answer
-        answer = kb.generate_answer(user_question, context)
-        
-        # Save to chat history
-        kb.save_chat_message(session_id, user_question, answer, search_results['metadatas'])
-        
-        return {
-            "question": user_question,
-            "answer": answer,
-            "sources": search_results['metadatas']
-        }
-    
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error processing chat: {str(e)}")
-
-@app.get("/documents")
-async def get_documents():
+# Database setup
+def init_db():
     conn = sqlite3.connect('knowledge_chatbot.db')
     cursor = conn.cursor()
-    cursor.execute('SELECT * FROM documents ORDER BY upload_date DESC')
+    
+    # Documents table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS documents (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            filename TEXT NOT NULL,
+            file_type TEXT NOT NULL,
+            file_size INTEGER,
+            upload_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            content TEXT
+        )
+    ''')
+    
+    # Chat sessions table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS chat_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT UNIQUE NOT NULL,
+            created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # Chat messages table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS chat_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT NOT NULL,
+            message TEXT NOT NULL,
+            is_user BOOLEAN NOT NULL,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (session_id) REFERENCES chat_sessions (session_id)
+        )
+    ''')
+    
+    conn.commit()
+    conn.close()
+
+# Initialize ChromaDB
+def init_chroma():
+    chroma_client = chromadb.PersistentClient(path="chroma_db")
+    collection = chroma_client.get_or_create_collection(
+        name="documents",
+        metadata={"description": "Document embeddings for chatbot"}
+    )
+    return chroma_client, collection
+
+# Initialize databases
+init_db()
+chroma_client, chroma_collection = init_chroma()
+
+# Password verification
+def verify_password(password):
+    return hashlib.sha256(password.encode()).hexdigest() == hashlib.sha256("HenLey@2003".encode()).hexdigest()
+
+# File processing functions
+def extract_text_from_pdf(file_path):
+    text = ""
+    with open(file_path, 'rb') as file:
+        reader = PyPDF2.PdfReader(file)
+        for page in reader.pages:
+            text += page.extract_text() + "\n"
+    return text
+
+def extract_text_from_docx(file_path):
+    doc = docx.Document(file_path)
+    text = ""
+    for paragraph in doc.paragraphs:
+        text += paragraph.text + "\n"
+    return text
+
+def extract_text_from_csv(file_path):
+    text = ""
+    with open(file_path, 'r', encoding='utf-8') as file:
+        reader = csv.reader(file)
+        for row in reader:
+            text += ", ".join(row) + "\n"
+    return text
+
+def extract_text_from_json(file_path):
+    with open(file_path, 'r', encoding='utf-8') as file:
+        data = json.load(file)
+        return json.dumps(data, indent=2)
+
+def process_uploaded_file(file):
+    filename = secure_filename(file.filename)
+    file_extension = filename.split('.')[-1].lower()
+    
+    # Save uploaded file temporarily
+    temp_path = f"temp_{uuid.uuid4().hex}_{filename}"
+    file.save(temp_path)
+    
+    try:
+        # Extract text based on file type
+        if file_extension == 'pdf':
+            content = extract_text_from_pdf(temp_path)
+        elif file_extension == 'docx':
+            content = extract_text_from_docx(temp_path)
+        elif file_extension == 'csv':
+            content = extract_text_from_csv(temp_path)
+        elif file_extension == 'json':
+            content = extract_text_from_json(temp_path)
+        elif file_extension == 'txt':
+            with open(temp_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+        else:
+            content = f"Unsupported file type: {file_extension}"
+        
+        # Store in SQLite
+        conn = sqlite3.connect('knowledge_chatbot.db')
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO documents (filename, file_type, file_size, content)
+            VALUES (?, ?, ?, ?)
+        ''', (filename, file_extension, len(content), content))
+        doc_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        # Store in ChromaDB
+        chroma_collection.add(
+            documents=[content],
+            metadatas=[{"filename": filename, "file_type": file_extension, "doc_id": doc_id}],
+            ids=[str(doc_id)]
+        )
+        
+        return {"success": True, "message": f"File '{filename}' uploaded successfully"}
+    
+    except Exception as e:
+        return {"success": False, "message": f"Error processing file: {str(e)}"}
+    
+    finally:
+        # Clean up temporary file
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+# Routes
+@app.route('/')
+def serve_frontend():
+    return send_from_directory('.', 'index.html')
+
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    if verify_password(data.get('password', '')):
+        session['admin'] = True
+        return jsonify({"success": True})
+    return jsonify({"success": False, "message": "Invalid password"})
+
+@app.route('/logout', methods=['POST'])
+def logout():
+    session.pop('admin', None)
+    return jsonify({"success": True})
+
+@app.route('/check_admin')
+def check_admin():
+    return jsonify({"is_admin": session.get('admin', False)})
+
+@app.route('/upload', methods=['POST'])
+def upload_file():
+    if not session.get('admin'):
+        return jsonify({"success": False, "message": "Unauthorized"})
+    
+    if 'file' not in request.files:
+        return jsonify({"success": False, "message": "No file provided"})
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"success": False, "message": "No file selected"})
+    
+    result = process_uploaded_file(file)
+    return jsonify(result)
+
+@app.route('/documents')
+def get_documents():
+    if not session.get('admin'):
+        return jsonify({"success": False, "message": "Unauthorized"})
+    
+    conn = sqlite3.connect('knowledge_chatbot.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT id, filename, file_type, file_size, upload_date FROM documents ORDER BY upload_date DESC')
     documents = cursor.fetchall()
     conn.close()
     
-    return {
-        "documents": [
-            {
-                "id": doc[0],
-                "filename": doc[1],
-                "file_type": doc[2],
-                "file_size": doc[3],
-                "content_hash": doc[4],
-                "upload_date": doc[5],
-                "chunk_count": doc[6],
-                "processed": bool(doc[7])
-            }
-            for doc in documents
-        ]
-    }
+    docs_list = []
+    for doc in documents:
+        docs_list.append({
+            'id': doc[0],
+            'filename': doc[1],
+            'file_type': doc[2],
+            'file_size': doc[3],
+            'upload_date': doc[4]
+        })
+    
+    return jsonify({"success": True, "documents": docs_list})
 
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+@app.route('/chat', methods=['POST'])
+def chat():
+    data = request.get_json()
+    message = data.get('message', '')
+    session_id = data.get('session_id', 'default')
+    
+    if not message.strip():
+        return jsonify({"success": False, "message": "Empty message"})
+    
+    # Search in ChromaDB for relevant content
+    try:
+        results = chroma_collection.query(
+            query_texts=[message],
+            n_results=3
+        )
+        
+        relevant_content = ""
+        if results['documents']:
+            for doc in results['documents'][0]:
+                relevant_content += doc + "\n\n"
+        
+        # Generate response based on relevant content
+        if relevant_content.strip():
+            response = f"I found this information in your documents:\n\n{relevant_content.strip()}"
+        else:
+            response = "I couldn't find relevant information in your uploaded documents. Please upload relevant documents or ask something else."
+    
+    except Exception as e:
+        response = f"Error searching documents: {str(e)}"
+    
+    # Store chat messages
+    conn = sqlite3.connect('knowledge_chatbot.db')
+    cursor = conn.cursor()
+    
+    # Ensure session exists
+    cursor.execute('INSERT OR IGNORE INTO chat_sessions (session_id) VALUES (?)', (session_id,))
+    
+    # Store user message
+    cursor.execute('''
+        INSERT INTO chat_messages (session_id, message, is_user)
+        VALUES (?, ?, ?)
+    ''', (session_id, message, True))
+    
+    # Store bot response
+    cursor.execute('''
+        INSERT INTO chat_messages (session_id, message, is_user)
+        VALUES (?, ?, ?)
+    ''', (session_id, response, False))
+    
+    conn.commit()
+    conn.close()
+    
+    return jsonify({"success": True, "response": response})
 
-if __name__ == "__main__":
+@app.route('/chat_history/<session_id>')
+def get_chat_history(session_id):
+    conn = sqlite3.connect('knowledge_chatbot.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT message, is_user, timestamp 
+        FROM chat_messages 
+        WHERE session_id = ? 
+        ORDER BY timestamp ASC
+    ''', (session_id,))
+    messages = cursor.fetchall()
+    conn.close()
+    
+    messages_list = []
+    for msg in messages:
+        messages_list.append({
+            'message': msg[0],
+            'is_user': bool(msg[1]),
+            'timestamp': msg[2]
+        })
+    
+    return jsonify({"success": True, "messages": messages_list})
+
+@app.route('/sessions')
+def get_sessions():
+    conn = sqlite3.connect('knowledge_chatbot.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT session_id, created_date FROM chat_sessions ORDER BY created_date DESC')
+    sessions = cursor.fetchall()
+    conn.close()
+    
+    sessions_list = []
+    for sess in sessions:
+        sessions_list.append({
+            'session_id': sess[0],
+            'created_date': sess[1]
+        })
+    
+    return jsonify({"success": True, "sessions": sessions_list})
+
+if __name__ == '__main__':
     # Create necessary directories
-    os.makedirs("static", exist_ok=True)
-    os.makedirs("uploads", exist_ok=True)
-    os.makedirs("chroma_db", exist_ok=True)
+    if not os.path.exists('chroma_db'):
+        os.makedirs('chroma_db')
     
-    print("🚀 Starting Personal Knowledge Chatbot...")
-    print("📚 Access the application at: http://localhost:8000")
-    print("💡 Upload documents to build your knowledge base")
-    print("🔍 Ask questions about your uploaded content")
-    print("💾 All data is stored locally and persists between sessions")
-    print("⏹️  Press Ctrl+C to stop the server\n")
-    
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+    app.run(debug=True, host='0.0.0.0', port=5000)
